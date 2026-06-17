@@ -450,9 +450,18 @@ function lget(k,d){try{var v=localStorage.getItem('wl2_'+k);return v!=null?JSON.
 function lset(k,v){try{localStorage.setItem('wl2_'+k,JSON.stringify(v));}catch(e){}}
 
 var prs=lget('prs',{}), setStates=lget('sets',{}), logs=lget('logs',[]);
-var curDay=lget('day',0), curWeek=lget('week',0), progRate=lget('rate',2.5);
+var curWeek=lget('week',0), progRate=lget('rate',2.5);
 var wDows=lget('dows',[1,2,4,6]);
 var lang=lget('lang','ko');
+function detectTodayDayIdx(){
+  var todayDow=new Date().getDay();
+  var idx=wDows.indexOf(todayDow);
+  return idx!==-1?idx:null;
+}
+var curDay=(function(){
+  var auto=detectTodayDayIdx();
+  return auto!==null?auto:lget('day',0);
+}());
 var curFilter='all', chartInst=null;
 var tTotal=120,tLeft=120,tRun=false,tInt=null,tOpen=false;
 var calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel=null;
@@ -546,7 +555,26 @@ function renderToday(){
   var dd=l.dayDefs[curDay];
   document.getElementById('D_TITLE').textContent=dd.title;
   var dow=wDows[curDay];
-  document.getElementById('D_SUB').textContent=dd.sub+(dow!=null?' ('+l.dowNames[dow]+')':'');
+  // Show if currently viewing today's actual day or a different day
+  var todayDow=new Date().getDay();
+  var todayIdx=wDows.indexOf(todayDow);
+  var isActualToday=(curDay===todayIdx);
+  var todayTag=isActualToday?' ★':'';
+  document.getElementById('D_SUB').textContent=dd.sub+(dow!=null?' ('+l.dowNames[dow]+todayTag+')':'');
+  // Rest day banner
+  var banner=document.getElementById('TODAY_BANNER');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='TODAY_BANNER';
+    banner.style.cssText='background:var(--sf);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--tx2);display:none;';
+    document.getElementById('EX_LIST').before(banner);
+  }
+  if(todayIdx===null){
+    banner.style.display='block';
+    banner.textContent=l.restDay+' — '+l.dowNames[todayDow];
+  } else {
+    banner.style.display='none';
+  }
   var list=document.getElementById('EX_LIST');
   list.innerHTML='';
   var ds=todayStr();
@@ -585,6 +613,7 @@ function tapSet(ds,di,ei,si,rest){
   if(setStates[k]==='d')openTimer(rest);
 }
 function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
+function resetToToday(){var auto=detectTodayDayIdx();if(auto!==null){curDay=auto;renderToday();}}
 function cycleWeek(){curWeek=(curWeek+1)%4;lset('week',curWeek);renderHeader();renderToday();toast(L().weekLabels[curWeek]);}
 
 // ===== TIMER =====
@@ -842,6 +871,7 @@ function sw(name){
   document.querySelectorAll('.ni').forEach(function(b){b.classList.remove('active');});
   document.getElementById('screen-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
+  if(name==='today'){var auto=detectTodayDayIdx();if(auto!==null)curDay=auto;renderToday();}
   if(name==='program')renderProgram();
   if(name==='pr')renderPRInputs();
   if(name==='cal')renderCal();
