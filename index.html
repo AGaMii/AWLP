@@ -167,7 +167,10 @@ select.pinp{appearance:none;}
     </div>
     <div id="VOL_BANNER"></div>
     <div id="EX_LIST"></div>
-    <button class="ghostb" id="BTN_TIMER" onclick="toggleTimer()"></button>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="ghostb" id="BTN_TIMER" onclick="toggleTimer()" style="flex:1;margin-top:0;"></button>
+      <button class="ghostb" id="BTN_RESET_DAY" onclick="confirmResetDay()" style="flex:0 0 auto;margin-top:0;padding:10px 14px;color:var(--r);border-color:rgba(226,75,74,.4);"></button>
+    </div>
     <div class="tsec" id="TIMER_SEC" style="display:none;">
       <div class="rwrap">
         <svg width="100" height="100" viewBox="0 0 100 100">
@@ -254,6 +257,7 @@ select.pinp{appearance:none;}
       <div class="ct"><i class="ti ti-download"></i> <span id="S_DATA"></span></div>
       <button class="ghostb" id="BTN_EXP" onclick="exportData()"></button>
       <button class="ghostb" id="BTN_IMP" onclick="document.getElementById('IMP_FILE').click()"></button>
+      <button class="ghostb" onclick="confirmResetAll()" style="color:var(--r);border-color:rgba(226,75,74,.4);" id="BTN_RESET_ALL"></button>
       <input type="file" id="IMP_FILE" accept=".json" style="display:none;" onchange="importData(event)">
     </div>
     <div class="card">
@@ -552,6 +556,10 @@ function applyLang(){
   document.getElementById('G_WT_L').textContent=l.gWtL;
   document.getElementById('G_DT_L').textContent=l.gDtL;
   document.getElementById('BTN_LOG').textContent=l.btnLog;
+  var rb=document.getElementById('BTN_RESET_DAY');
+  if(rb) rb.textContent=lang==='ko'?'하루 초기화':'Reset Today';
+  var rba=document.getElementById('BTN_RESET_ALL');
+  if(rba) rba.textContent=lang==='ko'?'전체 세트 초기화':'Reset All Sets';
   document.getElementById('G_HIST').textContent=l.gHist;
   document.getElementById('LBTN_KO').classList.toggle('active',lang==='ko');
   document.getElementById('LBTN_EN').classList.toggle('active',lang==='en');
@@ -607,20 +615,20 @@ function calcDayVolume(dayIdx, weekIdx){
     if(ex.prKey==='snatch'||ex.prKey==='snatchpull'){
       snatchKg+=vol; snatchReps+=reps*ex.sets;
       var zone=getPrilepinZone(ex.pct*(1+(weekIdx*(progRate/100))));
-      if(zone){prilepinReps+=reps*ex.sets;prilepinMin+=zone[3];prilepinMax+=zone[5];prilepinMin=Math.round(prilepinMin/ex.sets);prilepinMax=Math.round(prilepinMax/ex.sets);}
+      if(zone){prilepinReps+=reps*ex.sets;prilepinMin+=zone[3];prilepinMax+=zone[5];}
     }
     if(ex.prKey==='cleanjerk'){
       cjKg+=vol; cjReps+=reps*ex.sets;
     }
   });
-  return {totalKg:Math.round(totalKg),totalReps:totalReps,snatchKg:Math.round(snatchKg),snatchReps:snatchReps,cjKg:Math.round(cjKg),cjReps:cjReps,prilepinReps:prilepinReps,prilepinMin:prilepinMin||10,prilepinMax:prilepinMax||20};
+  return {totalKg:Math.round(totalKg),totalReps:totalReps,snatchKg:Math.round(snatchKg),snatchReps:snatchReps,cjKg:Math.round(cjKg),cjReps:cjReps,prilepinReps:prilepinReps,prilepinMin:prilepinMin,prilepinMax:prilepinMax};
 }
 function renderVolumeBanner(){
   var l=L();
   var v=calcDayVolume(curDay,curWeek);
   var banner=document.getElementById('VOL_BANNER');
   if(!banner) return;
-  var priPct=v.prilepinMax>0?Math.min(100,Math.round(v.prilepinReps/v.prilepinMax*100)):0;
+  var priPct=(v.prilepinMax>0&&v.prilepinReps>0)?Math.min(110,Math.round(v.prilepinReps/v.prilepinMax*100)):0;
   var barColor=priPct<60?'var(--r)':priPct>100?'#BA7517':'var(--g)';
   var statusText=priPct<60?(l.volLow||'부족'):(priPct>110?(l.volHigh||'과임'):(l.volOk||'적정'));
   var statusBg=priPct<60?'rgba(226,75,74,.12)':priPct>110?'rgba(186,117,23,.12)':'rgba(29,158,117,.12)';
@@ -653,13 +661,11 @@ function renderToday(){
   var dd=l.dayDefs[curDay];
   document.getElementById('D_TITLE').textContent=dd.title;
   var dow=wDows[curDay];
-  // Show if currently viewing today's actual day or a different day
   var todayDow=new Date().getDay();
   var todayIdx=wDows.indexOf(todayDow);
   var isActualToday=(curDay===todayIdx);
-  var todayTag=isActualToday?' ★':'';
-  document.getElementById('D_SUB').textContent=dd.sub+(dow!=null?' ('+l.dowNames[dow]+todayTag+')':'');
-  // Rest day banner
+  document.getElementById('D_SUB').textContent=dd.sub+(dow!=null?' ('+l.dowNames[dow]+(isActualToday?' ★':'')+')':'');
+
   var banner=document.getElementById('TODAY_BANNER');
   if(!banner){
     banner=document.createElement('div');
@@ -669,45 +675,64 @@ function renderToday(){
   }
   if(todayIdx===null){
     banner.style.display='block';
-    banner.textContent=l.restDay+' — '+l.dowNames[todayDow];
+    banner.textContent=(lang==='ko'?'휴식일 — ':' Rest — ')+l.dowNames[todayDow];
   } else {
     banner.style.display='none';
   }
+
+  var ds=todayStr();
   var list=document.getElementById('EX_LIST');
   list.innerHTML='';
-  var ds=todayStr();
+
   EX_DEFS[curDay].forEach(function(ex,ei){
     var exName=l.exNames2[curDay][ei];
     var w=calcW(ex,curWeek);
     var bw=isBodyweight(ex);
     var acc=isAccessory(ex);
+
     var div=document.createElement('div');
     div.className='exc'+(acc?' exc-acc':'');
+
     var drvHtml='';
     if(ex.drv){
       var basePR=getPR(ex.drv.fromKey);
       var derived=Math.round(basePR*ex.drv.fromPct/100/2.5)*2.5;
       drvHtml='<div class="exd">= '+l.exNames[ex.drv.fromKey]+' PR '+basePR+'kg × '+ex.drv.fromPct+'% → '+derived+'kg</div>';
     }
+
     var accBadge=acc?'<span style="font-size:10px;background:rgba(186,117,23,.15);color:#BA7517;border-radius:4px;padding:2px 6px;margin-left:6px;">'+(lang==='ko'?'보조':'ACC')+'</span>':'';
     var chipHtml=bw
-      ? '<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span>'
-      : '<span class="wchip">'+w+' kg</span>';
+      ?'<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span>'
+      :'<span class="wchip">'+w+' kg</span>';
     var repsDisp=ex.reps==='0'?(lang==='ko'?'30습 홀드':'30s hold'):ex.reps;
-    var sets='';
+
+    var srow=document.createElement('div');
+    srow.className='srow';
+
     for(var s=0;s<ex.sets;s++){
       var k=setKey(ds,curDay,ei,s);
       var st=setStates[k]||'p';
-      sets+='<button class="sbtn'+(st==='d'?' done':st==='f'?' failed':'')+'" onclick="tapSet(\"'+ds+'\",'+curDay+','+ei+','+s+','+ex.rest+')">'+  (s+1)+'</button>';
+      var btn=document.createElement('button');
+      btn.className='sbtn'+(st==='d'?' done':st==='f'?' failed':'');
+      btn.textContent=s+1;
+      btn.dataset.ds=ds;
+      btn.dataset.di=curDay;
+      btn.dataset.ei=ei;
+      btn.dataset.si=s;
+      btn.dataset.rest=ex.rest;
+      btn.addEventListener('click', function(){
+        tapSet(this.dataset.ds, parseInt(this.dataset.di), parseInt(this.dataset.ei), parseInt(this.dataset.si), parseInt(this.dataset.rest));
+      });
+      srow.appendChild(btn);
     }
+
     div.innerHTML='<div class="exn">'+exName+accBadge+'</div>'+drvHtml+
-      '<div class="exm">'+chipHtml+'<span class="epct">'+ex.sets+'×'+repsDisp+(bw?'':' · '+Math.round(ex.pct*100)+'%')+'</span></div>'+
-      '<div class="srow">'+sets+'</div>';
+      '<div class="exm">'+chipHtml+'<span class="epct">'+ex.sets+'×'+repsDisp+(bw?'':' · '+Math.round(ex.pct*100)+'%')+'</span></div>';
+    div.appendChild(srow);
     list.appendChild(div);
   });
   renderVolumeBanner();
 }
-
 function tapSet(ds,di,ei,si,rest){
   var k=setKey(ds,di,ei,si);
   var c=setStates[k]||'p';
@@ -720,6 +745,24 @@ function tapSet(ds,di,ei,si,rest){
 function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
 function resetToToday(){var auto=detectTodayDayIdx();if(auto!==null){curDay=auto;renderToday();}}
 function cycleWeek(){curWeek=(curWeek+1)%4;lset('week',curWeek);renderHeader();renderToday();toast(L().weekLabels[curWeek]);}
+function confirmResetDay(){
+  var msg=lang==='ko'?'오늘 운동 기록을 초기화할까요?':'Reset today workout records?';
+  if(!confirm(msg)) return;
+  var ds=todayStr();
+  Object.keys(setStates).forEach(function(k){ if(k.indexOf(ds)===0) delete setStates[k]; });
+  lset('sets',setStates);
+  renderToday();
+  toast(lang==='ko'?'초기화 완료':'Reset done');
+}
+function confirmResetAll(){
+  var msgKo='모든 세트 기록을 초기화할까요? (PR 및 그래프 기록은 유지됩니다)';
+  var msgEn='Reset all set records? PR and graph records are kept.';
+  if(!confirm(lang==='ko'?msgKo:msgEn)) return;
+  setStates={};
+  lset('sets',setStates);
+  renderToday();
+  toast(lang==='ko'?'전체 초기화 완료':'All reset');
+}
 
 // ===== TIMER =====
 function openTimer(s){tTotal=s;tLeft=s;tRun=false;clearInterval(tInt);updTDisp();document.getElementById('TIMER_SEC').style.display='block';tOpen=true;document.getElementById('T_BTN').textContent=L().tStart;document.getElementById('TIMER_SEC').scrollIntoView({behavior:'smooth',block:'nearest'});}
@@ -748,6 +791,91 @@ function updTDisp(){
 }
 
 // ===== CALENDAR =====
+function calMv(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
+function renderCal(){
+  var l=L();
+  var mons_ko=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  var mons_en=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('CAL_MON').textContent=lang==='ko'?calY+'년 '+mons_ko[calM]:mons_en[calM]+' '+calY;
+  document.getElementById('CAL_DOW').innerHTML=l.dowNames.map(function(n){return '<div class="cdow">'+n+'</div>';}).join('');
+  var first=new Date(calY,calM,1).getDay();
+  var days=new Date(calY,calM+1,0).getDate();
+  var tn=new Date();
+  var todayKey=dStr(tn.getFullYear(),tn.getMonth(),tn.getDate());
+  var html='';
+  for(var i=0;i<first;i++)html+='<div class="cday emp"></div>';
+  for(var d=1;d<=days;d++){
+    var ds=dStr(calY,calM,d);
+    var date=new Date(calY,calM,d);
+    var di=dateWorkoutDay(date);
+    var isW=di!==null;
+    var hl=hasLog(ds);
+    var isT=ds===todayKey;
+    var isS=ds===calSel;
+    var cls='cday'+(isW?' wday':'')+(hl?' hlog':'')+(isT?' today':'')+(isS?' sel':'');
+    var lbl=isW?'<span style="font-size:8px;color:'+(isS?'#fff':'var(--g)')+';font-weight:600;">D'+(di+1)+'</span>':'';
+    html+='<div class="'+cls+'" onclick="selCal(\''+ds+'\','+di+')"><div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span>'+d+'</span>'+lbl+'</div></div>';
+  }
+  document.getElementById('CAL_DAYS').innerHTML=html;
+  if(calSel)renderCalDet(calSel);
+}
+function selCal(ds,di){calSel=ds;renderCal();renderCalDet(ds,di);}
+function renderCalDet(ds,diOvr){
+  var l=L();
+  var det=document.getElementById('CAL_DET');
+  var date=new Date(ds+'T00:00:00');
+  var di=diOvr!=null?diOvr:dateWorkoutDay(date);
+  if(di===null){
+    var keys=Object.keys(setStates).filter(function(k){return k.indexOf(ds)===0;});
+    if(keys.length>0) di=parseInt(keys[0].split('-')[3]);
+  }
+  if(di===null||di<0||di>3){
+    det.style.display='block';
+    det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div><div style="font-size:13px;color:var(--tx2);">'+l.restDay+'</div>';
+    return;
+  }
+  var dd=l.dayDefs[di];
+  var dowN=l.dowNames[date.getDay()];
+  var tot=0,done=0;
+  EX_DEFS[di].forEach(function(ex,ei){
+    for(var s=0;s<ex.sets;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}
+  });
+
+  det.style.display='block';
+  det.innerHTML=
+    '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — '+dd.title+'</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:10px;">'+
+    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--g);">'+done+'</div><div style="font-size:10px;color:var(--tx2);">'+l.doneSets+'</div></div>'+
+    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--tx);">'+(tot-done)+'</div><div style="font-size:10px;color:var(--tx2);">'+l.remaining+'</div></div>'+
+    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--tx);">'+(tot>0?Math.round(done/tot*100):0)+'%</div><div style="font-size:10px;color:var(--tx2);">'+l.successRate+'</div></div>'+
+    '</div><div style="font-size:11px;color:var(--tx3);margin-bottom:8px;">'+l.dotTip+'</div>';
+
+  EX_DEFS[di].forEach(function(ex,ei){
+    var nm=l.exNames2[di][ei];
+    var w=calcW(ex,curWeek);
+    var d2=0;
+    var dotsEl=document.createElement('div');
+    dotsEl.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:130px;';
+    for(var s=0;s<ex.sets;s++){
+      var k=setKey(ds,di,ei,s);
+      var st=setStates[k]||'p';
+      if(st==='d') d2++;
+      var col=st==='d'?'#1D9E75':st==='f'?'#E24B4A':'var(--bd2)';
+      var dotEl=document.createElement('span');
+      dotEl.className='cdot';
+      dotEl.style.background=col;
+      (function(dds,ddi,dei,dsi,drest){
+        dotEl.addEventListener('click',function(){ tapSet(dds,ddi,dei,dsi,drest); });
+      })(ds,di,ei,s,ex.rest);
+      dotsEl.appendChild(dotEl);
+    }
+    var rowEl=document.createElement('div');
+    rowEl.className='cexr';
+    rowEl.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+nm+'</div><div style="font-size:11px;color:var(--tx2);">'+(isBodyweight(ex)?'BW':w+'kg')+' · '+d2+'/'+ex.sets+'</div></div>';
+    rowEl.appendChild(dotsEl);
+    det.appendChild(rowEl);
+  });
+}
 function calMv(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
 function renderCal(){
   var l=L();
