@@ -379,7 +379,7 @@ var LNG = {
     ios1:'Safari로 GitHub Pages URL 열기', ios2:'하단 공유 버튼 → 홈 화면에 추가',
     and1:'Chrome으로 GitHub Pages URL 열기', and2:'점 3개 메뉴 → Share → Add to Home screen',
     tNext:'다음 세트까지 남은 시간', tAdj:'15초 조절', tClose:'닫기',
-    tOpen:'휴식 타이머 열기', tStart:'시작', tPause:'일시정지', tResume:'재개',
+    tOpen:'휴식 타이머 열기', tStart:'▶', tPause:'⏸', tResume:'▶',
     weekLabels:['1주 기초','2주 축적','3주 강화','4주 피크'],
     intensityLabel:'강도',
     gAdd:'기록 추가', gExL:'종목', gWtL:'중량 (kg)', gDtL:'날짜', btnLog:'기록 추가',
@@ -435,7 +435,7 @@ var LNG = {
     ios1:'Open GitHub Pages URL in Safari', ios2:'Share button → Add to Home Screen',
     and1:'Open GitHub Pages URL in Chrome', and2:'3-dot menu → Share → Add to Home screen',
     tNext:'Time until next set', tAdj:'±15s', tClose:'Close',
-    tOpen:'Rest Timer', tStart:'Start', tPause:'Pause', tResume:'Resume',
+    tOpen:'Rest Timer', tStart:'▶', tPause:'⏸', tResume:'▶',
     weekLabels:['W1 Base','W2 Volume','W3 Intensity','W4 Peak'],
     intensityLabel:'Intensity',
     gAdd:'Add Record', gExL:'Exercise', gWtL:'Weight (kg)', gDtL:'Date', btnLog:'Add',
@@ -706,7 +706,7 @@ function renderToday(){
     var chipHtml=bw
       ?'<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span>'
       :'<span class="wchip">'+w+' kg</span>';
-    var repsDisp=ex.reps==='0'?(lang==='ko'?'30습 홀드':'30s hold'):ex.reps;
+    var repsDisp=ex.reps==='0'?('30s'):ex.reps;
 
     var srow=document.createElement('div');
     srow.className='srow';
@@ -878,76 +878,6 @@ function renderCalDet(ds,diOvr){
     det.appendChild(rowEl);
   });
 }
-function calMv(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
-function renderCal(){
-  var l=L();
-  var mons_ko=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  var mons_en=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('CAL_MON').textContent=lang==='ko'?calY+'년 '+mons_ko[calM]:mons_en[calM]+' '+calY;
-  document.getElementById('CAL_DOW').innerHTML=l.dowNames.map(function(n){return '<div class="cdow">'+n+'</div>';}).join('');
-  var first=new Date(calY,calM,1).getDay();
-  var days=new Date(calY,calM+1,0).getDate();
-  var tn=new Date();
-  var todayKey=dStr(tn.getFullYear(),tn.getMonth(),tn.getDate());
-  var html='';
-  for(var i=0;i<first;i++)html+='<div class="cday emp"></div>';
-  for(var d=1;d<=days;d++){
-    var ds=dStr(calY,calM,d);
-    var date=new Date(calY,calM,d);
-    var di=dateWorkoutDay(date);
-    var isW=di!==null;
-    var hl=hasLog(ds);
-    var isT=ds===todayKey;
-    var isS=ds===calSel;
-    var cls='cday'+(isW?' wday':'')+(hl?' hlog':'')+(isT?' today':'')+(isS?' sel':'');
-    var lbl=isW?'<span style="font-size:8px;color:'+(isS?'#fff':'var(--g)')+';font-weight:600;">D'+(di+1)+'</span>':'';
-    html+='<div class="'+cls+'" onclick="selCal(\''+ds+'\','+di+')"><div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span>'+d+'</span>'+lbl+'</div></div>';
-  }
-  document.getElementById('CAL_DAYS').innerHTML=html;
-  if(calSel)renderCalDet(calSel);
-}
-function selCal(ds,di){calSel=ds;renderCal();renderCalDet(ds,di);}
-function renderCalDet(ds,diOvr){
-  var l=L();
-  var det=document.getElementById('CAL_DET');
-  var date=new Date(ds+'T00:00:00');
-  var di=diOvr!=null?diOvr:dateWorkoutDay(date);
-  if(di===null){
-    var keys=Object.keys(setStates).filter(function(k){return k.indexOf(ds)===0;});
-    if(keys.length>0)di=parseInt(keys[0].split('-')[3]);
-  }
-  if(di===null||di<0||di>3){
-    det.style.display='block';
-    det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div><div style="font-size:13px;color:var(--tx2);">'+l.restDay+'</div>';
-    return;
-  }
-  var dd=l.dayDefs[di];
-  var dowN=l.dowNames[date.getDay()];
-  var tot=0,done=0;
-  EX_DEFS[di].forEach(function(ex,ei){for(var s=0;s<ex.sets;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
-  var rows=EX_DEFS[di].map(function(ex,ei){
-    var nm=l.exNames2[di][ei];
-    var w=calcW(ex,curWeek);
-    var d2=0;
-    var dots='';
-    for(var s=0;s<ex.sets;s++){
-      var k=setKey(ds,di,ei,s);
-      var st=setStates[k]||'p';
-      if(st==='d')d2++;
-      var col=st==='d'?'#1D9E75':st==='f'?'#E24B4A':'var(--bd2)';
-      dots+='<span class="cdot" style="background:'+col+';" onclick="tapSet(\''+ds+'\','+di+','+ei+','+s+','+ex.rest+')"></span>';
-    }
-    return '<div class="cexr"><div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+nm+'</div><div style="font-size:11px;color:var(--tx2);">'+w+'kg · '+d2+'/'+ex.sets+'</div></div><div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:130px;">'+dots+'</div></div>';
-  }).join('');
-  det.style.display='block';
-  det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — '+dd.title+'</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:10px;">'+
-    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--g);">'+done+'</div><div style="font-size:10px;color:var(--tx2);">'+l.doneSets+'</div></div>'+
-    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--tx);">'+(tot-done)+'</div><div style="font-size:10px;color:var(--tx2);">'+l.remaining+'</div></div>'+
-    '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--tx);">'+(tot>0?Math.round(done/tot*100):0)+'%</div><div style="font-size:10px;color:var(--tx2);">'+l.successRate+'</div></div>'+
-    '</div><div style="font-size:11px;color:var(--tx3);margin-bottom:8px;">'+l.dotTip+'</div>'+rows;
-}
-
 // ===== DOW =====
 function renderDowGrid(){
   var l=L();
@@ -1023,7 +953,7 @@ function renderProgram(){
       var acc=isAccessory(ex);
       var note=ex.drv?'<div class="pexnote">= '+l.exNames[ex.drv.fromKey]+' PR × '+ex.drv.fromPct+'%</div>':'';
       var accTag=acc?'<span style="font-size:10px;color:#BA7517;"> ('+(lang==='ko'?'보조':'acc')+')</span>':'';
-      var repsDisp=ex.reps==='0'?(lang==='ko'?'30습 홀드':'30s hold'):ex.reps;
+      var repsDisp=ex.reps==='0'?('30s'):ex.reps;
       var wdisp=bw?(lang==='ko'?'맨몸':'BW'):(w+'kg');
       return '<div class="pexr"><div><span class="pexn">'+nm+accTag+'</span>'+note+'</div><div class="pexrv">'+ex.sets+'×'+repsDisp+'<br><b>'+wdisp+'</b></div></div>';
     }).join('');
