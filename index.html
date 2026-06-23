@@ -205,6 +205,7 @@ select.pinp{appearance:none;}
       </div>
       <div class="cgrid" id="CAL_DOW"></div>
       <div class="cgrid" id="CAL_DAYS"></div>
+      <div id="CAL_LEGEND" style="font-size:10px;color:var(--tx2);margin-top:10px;line-height:1.6;"></div>
     </div>
     <div class="cdet" id="CAL_DET" style="display:none;"></div>
   </div>
@@ -242,6 +243,13 @@ select.pinp{appearance:none;}
         <span class="punit">%</span>
       </div>
       <div style="font-size:12px;color:var(--tx2);line-height:1.6;" id="S_PROG_DESC"></div>
+      <div class="prow" style="margin-top:12px;">
+        <span class="plbl" id="S_ROUND_LBL"></span>
+        <select class="pinp" id="ROUND_UNIT" onchange="saveRoundUnit()">
+          <option value="2.5">2.5 kg</option>
+          <option value="5">5 kg</option>
+        </select>
+      </div>
     </div>
     <div class="card">
       <div class="ct"><i class="ti ti-calendar-week"></i> <span id="S_DOW"></span></div>
@@ -269,6 +277,7 @@ select.pinp{appearance:none;}
 
   <!-- GRAPH -->
   <div class="screen" id="screen-graph">
+    <div id="PR_SUMMARY"></div>
     <div class="frow" id="G_FILTERS"></div>
     <div class="card" style="padding:14px 10px;">
       <div style="position:relative;width:100%;height:220px;">
@@ -315,7 +324,7 @@ var EX_DEFS = [
     {prKey:'snatch',     pct:0.88, sets:4, reps:'2',   rest:150, drv:{fromKey:'snatch',fromPct:88,label:'hangsnatch'}, acc:false},
     {prKey:'snatchpull', pct:0.90, sets:4, reps:'3',   rest:150, drv:null,     acc:false},
     {prKey:'squat',      pct:0.80, sets:4, reps:'4',   rest:180, drv:null,     acc:false},
-    {prKey:'squat',      pct:0.65, sets:3, reps:'3',   rest:150, drv:null,     acc:true},
+    {prKey:'snatch',     pct:0.90, sets:3, reps:'3',   rest:150, drv:null,     acc:true},
     {prKey:'squat',      pct:0.50, sets:3, reps:'0',   rest:60,  drv:null,     acc:true},
     {prKey:'none',       pct:0,    sets:3, reps:'15',  rest:60,  drv:null,     acc:true}
   ],
@@ -336,7 +345,7 @@ var EX_DEFS = [
     {prKey:'cleanjerk',  pct:0.78, sets:5, reps:'2+1', rest:180, drv:null,     acc:false},
     {prKey:'cleanjerk',  pct:0.72, sets:4, reps:'3',   rest:150, drv:null,     acc:false},
     {prKey:'squat',      pct:0.85, sets:4, reps:'3',   rest:180, drv:null,     acc:false},
-    {prKey:'squat',      pct:0.70, sets:3, reps:'3',   rest:150, drv:null,     acc:true},
+    {prKey:'frontsquat', pct:0.75, sets:3, reps:'3',   rest:150, drv:null,     acc:true},
     {prKey:'deadlift',   pct:0.75, sets:3, reps:'3',   rest:150, drv:null,     acc:true},
     {prKey:'none',       pct:0,    sets:3, reps:'15',  rest:60,  drv:null,     acc:true},
     {prKey:'none',       pct:0,    sets:3, reps:'0',   rest:60,  drv:null,     acc:true}
@@ -355,7 +364,7 @@ var EX_DEFS = [
 ];
 
 var DIRECT_KEYS = ['snatch','snatchpull','cleanjerk','deadlift','squat','frontsquat','press','pinsquat','pindeadlift'];
-var DEFAULTS = {snatch:70,snatchpull:90,cleanjerk:90,deadlift:120,squat:110,frontsquat:90,press:55,pinsquat:100,pindeadlift:130};
+var DEFAULTS = {snatch:70,snatchpull:90,cleanjerk:90,deadlift:120,squat:110,frontsquat:90,press:55,pinsquat:155,pindeadlift:180};
 var EX_COLORS = {snatch:'#1D9E75',cleanjerk:'#378ADD',deadlift:'#D85A30',squat:'#7F77DD',frontsquat:'#7F77DD',press:'#BA7517',hangsnatch:'#1D9E75',hangclean:'#378ADD',snatchpull:'#0F6E56',pinsquat:'#9B59B6',pindeadlift:'#E67E22'};
 
 // ===== TRANSLATIONS =====
@@ -368,6 +377,7 @@ var LNG = {
     sPR:'나의 PR (1RM) 입력', btnSavePR:'저장하기',
     sProg:'점진적 과부하', sRateLbl:'주간 증가율',
     sProgDesc:'매주 이 비율로 목표 중량이 자동 증가합니다. 중급자 권장: 2~3% / 초급자: 3~5%',
+    sRoundLbl:'반올림 단위',
     sDow:'운동 요일 설정 (최대 4일)', btnSaveDow:'요일 저장',
     dowNames:['일','월','화','수','목','금','토'],
     sData:'데이터 관리', btnExp:'JSON으로 내보내기', btnImp:'JSON 불러오기',
@@ -381,6 +391,7 @@ var LNG = {
     gAdd:'기록 추가', gExL:'종목', gWtL:'중량 (kg)', gDtL:'날짜', btnLog:'기록 추가',
     gHist:'최근 기록', noRec:'기록이 없습니다.',
     restDay:'휴식일', doneSets:'완료', remaining:'미완료', successRate:'성공률',
+    prTestBanner:'🏆 피크 주간 — 오늘 메인 리프트 PR 측정 권장일', prTestStep:'90% → 95% → 100% → 신규 PR 도전', prTestHint:'성공 시 그래프 탭에서 새 PR을 기록하세요',
     dotTip:'점을 탭해서 세트 상태 변경',
     newPR:'새 PR!', logAdded:'기록 추가됨', saved:'저장 완료!',
     dowSaved:'요일 저장 완료!', exported:'내보내기 완료', imported:'불러오기 완료!', importErr:'파일 형식 오류',
@@ -424,6 +435,7 @@ var LNG = {
     sPR:'My PR (1RM)', btnSavePR:'Save',
     sProg:'Progressive Overload', sRateLbl:'Weekly increase',
     sProgDesc:'Target weight increases each week. Intermediate: 2~3% / Beginner: 3~5%',
+    sRoundLbl:'Rounding unit',
     sDow:'Training Days (max 4)', btnSaveDow:'Save Days',
     dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
     sData:'Data', btnExp:'Export JSON', btnImp:'Import JSON',
@@ -437,6 +449,7 @@ var LNG = {
     gAdd:'Add Record', gExL:'Exercise', gWtL:'Weight (kg)', gDtL:'Date', btnLog:'Add',
     gHist:'Recent Records', noRec:'No records yet.',
     restDay:'Rest day', doneSets:'Done', remaining:'Remaining', successRate:'Success',
+    prTestBanner:'🏆 Peak Week — PR test recommended for main lift today', prTestStep:'90% → 95% → 100% → attempt new PR', prTestHint:'Log your new PR in the Graph tab if successful',
     dotTip:'Tap dots to toggle set status',
     newPR:'New PR!', logAdded:'Record added', saved:'Saved!',
     dowSaved:'Days saved!', exported:'Exported', imported:'Imported!', importErr:'Invalid file',
@@ -480,6 +493,7 @@ var prs=lget('prs',{}), setStates=lget('sets',{}), logs=lget('logs',[]);
 var curWeek=lget('week',0), progRate=lget('rate',2.5);
 var wDows=lget('dows',[1,2,4,6]);
 var lang=lget('lang','ko');
+var roundUnit=lget('roundUnit',5);
 function detectTodayDayIdx(){
   var todayDow=new Date().getDay();
   var idx=wDows.indexOf(todayDow);
@@ -497,16 +511,24 @@ var tmpDows=[].concat(wDows);
 // ===== HELPERS =====
 function L(){return LNG[lang];}
 function getPR(k){return prs[k]||DEFAULTS[k]||80;}
+function roundW(w){return Math.round(w/roundUnit)*roundUnit;}
+function isPeakWeek(){return curWeek===3;}
+function getMainTestLift(dayIdx){
+  // Returns the primary classic lift to test on this day's peak session
+  if(dayIdx===0) return 'snatch';      // Day 1 snatch focus
+  if(dayIdx===2) return 'cleanjerk';   // Day 3 C&J focus
+  return null;                          // Day 2,4 little days - no test
+}
 function calcW(ex,wk){
   if(ex.prKey==='none'||ex.pct===0) return 0;
   var basePR;
   if(ex.drv){
-    basePR = Math.round(getPR(ex.drv.fromKey)*ex.drv.fromPct/100/2.5)*2.5;
+    basePR = roundW(getPR(ex.drv.fromKey)*ex.drv.fromPct/100);
   } else {
     basePR = getPR(ex.prKey);
   }
   var mult = 1 + wk*(progRate/100);
-  return Math.round(basePR*ex.pct*mult/2.5)*2.5;
+  return roundW(basePR*ex.pct*mult);
 }
 function isBodyweight(ex){ return ex.prKey==='none'||ex.pct===0; }
 function isAccessory(ex){ return ex.acc===true; }
@@ -534,6 +556,7 @@ function applyLang(){
   document.getElementById('S_PROG').textContent=l.sProg;
   document.getElementById('S_RATE_LBL').textContent=l.sRateLbl;
   document.getElementById('S_PROG_DESC').textContent=l.sProgDesc;
+  var srl=document.getElementById('S_ROUND_LBL');if(srl)srl.textContent=l.sRoundLbl;
   document.getElementById('S_DOW').textContent=l.sDow;
   document.getElementById('BTN_SAVE_DOW').textContent=l.btnSaveDow;
   document.getElementById('S_DATA').textContent=l.sData;
@@ -676,6 +699,28 @@ function renderToday(){
     banner.style.display='none';
   }
 
+  // PR test banner on peak week big days
+  var prBanner=document.getElementById('PR_TEST_BANNER');
+  if(!prBanner){
+    prBanner=document.createElement('div');
+    prBanner.id='PR_TEST_BANNER';
+    prBanner.style.cssText='background:linear-gradient(135deg,rgba(186,117,23,.12),rgba(29,158,117,.12));border:.5px solid rgba(186,117,23,.4);border-radius:var(--ra);padding:12px 14px;margin-bottom:12px;display:none;';
+    document.getElementById('EX_LIST').before(prBanner);
+  }
+  var testLift=getMainTestLift(curDay);
+  if(isPeakWeek()&&testLift){
+    var testPR=getPR(testLift);
+    var liftName=l.exNames[testLift]||testLift;
+    prBanner.style.display='block';
+    prBanner.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+l.prTestBanner+'</div>'+
+      '<div style="font-size:12px;color:var(--tx2);margin-bottom:4px;">'+liftName+' '+l.prTestStep+'</div>'+
+      '<div style="font-size:12px;color:var(--tx);margin-bottom:4px;">'+
+        roundW(testPR*0.90)+'kg → '+roundW(testPR*0.95)+'kg → '+testPR+'kg → ?</div>'+
+      '<div style="font-size:11px;color:var(--b);">'+l.prTestHint+'</div>';
+  } else {
+    prBanner.style.display='none';
+  }
+
   var ds=todayStr();
   var list=document.getElementById('EX_LIST');
   list.innerHTML='';
@@ -692,7 +737,7 @@ function renderToday(){
     var drvHtml='';
     if(ex.drv){
       var basePR=getPR(ex.drv.fromKey);
-      var derived=Math.round(basePR*ex.drv.fromPct/100/2.5)*2.5;
+      var derived=roundW(basePR*ex.drv.fromPct/100);
       drvHtml='<div class="exd">= '+l.exNames[ex.drv.fromKey]+' PR '+basePR+'kg × '+ex.drv.fromPct+'% → '+derived+'kg</div>';
     }
 
@@ -804,6 +849,8 @@ function renderCal(){
     html+='<div class="'+cls+'" onclick="selCal(\''+ds+'\','+di+')"><div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span>'+d+'</span>'+lbl+'</div></div>';
   }
   document.getElementById('CAL_DAYS').innerHTML=html;
+  var leg=document.getElementById('CAL_LEGEND');
+  if(leg){leg.textContent=lang==='ko'?'🏆 4주 사이클의 피크 주간(4주차)에는 Day 1·Day 3에서 PR 측정을 권장합니다.':'🏆 During peak week (W4), PR testing is recommended on Day 1 & Day 3.';}
   if(calSel)renderCalDet(calSel);
 }
 function selCal(ds,di){calSel=ds;renderCal();renderCalDet(ds,di);}
@@ -881,6 +928,12 @@ function togDow(i){
   else{toast(L().maxDow);return;}
   renderDowGrid();
 }
+function saveRoundUnit(){
+  roundUnit=parseFloat(document.getElementById('ROUND_UNIT').value)||5;
+  lset('roundUnit',roundUnit);
+  renderToday();renderHeader();updDrv();
+  toast(lang==='ko'?'반올림 단위 '+roundUnit+'kg 적용':'Rounding '+roundUnit+'kg applied');
+}
 function saveDow(){
   if(tmpDows.length===0){toast(L().minDow);return;}
   wDows=tmpDows.slice().sort(function(a,b){return a-b;});
@@ -895,6 +948,7 @@ function renderPRInputs(){
     return '<div class="prow"><span class="plbl">'+l.exNames[k]+'</span><input class="pinp" id="PR_'+k+'" type="number" value="'+getPR(k)+'" step="2.5" min="20" oninput="updDrv()"><span class="punit">kg</span></div>';
   }).join('');
   document.getElementById('PROG_RATE').value=progRate;
+  var ru=document.getElementById('ROUND_UNIT');if(ru)ru.value=roundUnit;
   tmpDows=wDows.slice();
   renderDowGrid();
   updDrv();
@@ -903,8 +957,8 @@ function updDrv(){
   var l=L();
   var sn=parseFloat(document.getElementById('PR_snatch')?document.getElementById('PR_snatch').value:getPR('snatch'))||getPR('snatch');
   var cj=parseFloat(document.getElementById('PR_cleanjerk')?document.getElementById('PR_cleanjerk').value:getPR('cleanjerk'))||getPR('cleanjerk');
-  var hs=Math.round(sn*0.88/2.5)*2.5;
-  var hc=Math.round(cj*0.88/2.5)*2.5;
+  var hs=roundW(sn*0.88);
+  var hc=roundW(cj*0.88);
   document.getElementById('DRV_TITLE').textContent=l.drvTitle;
   document.getElementById('DRV_ROWS').innerHTML=
     '<div class="drow"><span>'+l.exNames['hangsnatch']+'</span><span>'+l.exNames['snatch']+' '+sn+'kg x 88% = <b style="color:var(--b)">'+hs+'kg</b></span></div>'+
@@ -955,8 +1009,34 @@ function renderGFilters(){
   }).join('');
 }
 function setFilt(k){curFilter=k;renderGFilters();renderGraph();}
+function renderPRSummary(){
+  var l=L();
+  var el=document.getElementById('PR_SUMMARY');
+  if(!el) return;
+  var mains=['snatch','cleanjerk'];
+  var today=new Date();
+  var rows=mains.map(function(k){
+    var liftLogs=logs.filter(function(x){return x.ex===k;}).sort(function(a,b){return a.date>b.date?1:-1;});
+    var cur=getPR(k);
+    var lastDate=liftLogs.length?liftLogs[liftLogs.length-1].date:null;
+    var daysAgo='';
+    if(lastDate){
+      var diff=Math.floor((today-new Date(lastDate+'T00:00:00'))/86400000);
+      daysAgo=lang==='ko'?diff+'일 전':diff+'d ago';
+    } else {
+      daysAgo=lang==='ko'?'기록 없음':'no record';
+    }
+    return '<div style="flex:1;background:var(--sf);border-radius:8px;padding:10px;text-align:center;">'+
+      '<div style="font-size:11px;color:var(--tx2);margin-bottom:3px;">'+(l.exNames[k]||k)+'</div>'+
+      '<div style="font-size:20px;font-weight:700;color:'+(k==='snatch'?'var(--g)':'var(--b)')+';">'+cur+'<span style="font-size:11px;color:var(--tx2);font-weight:400;"> kg</span></div>'+
+      '<div style="font-size:10px;color:var(--tx3);margin-top:2px;">'+daysAgo+'</div>'+
+    '</div>';
+  }).join('');
+  el.innerHTML='<div class="card" style="padding:12px;"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:10px;"><i class="ti ti-trophy" style="color:var(--g)"></i> '+(lang==='ko'?'현재 PR 현황':'Current PR Status')+'</div><div style="display:flex;gap:8px;">'+rows+'</div></div>';
+}
 function renderGraph(){
   var l=L();
+  renderPRSummary();
   var filtered=curFilter==='all'?logs:logs.filter(function(x){return x.ex===curFilter;});
   var hist=document.getElementById('HIST_LIST');
   if(!filtered.length){hist.innerHTML='<div style="font-size:13px;color:var(--tx2);">'+l.noRec+'</div>';}
@@ -996,7 +1076,7 @@ function delLog(idx){if(idx<0||idx>=logs.length)return;logs.splice(idx,1);lset('
 
 // ===== DATA =====
 function exportData(){
-  var data={prs:prs,logs:logs,progRate:progRate,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,progRate:progRate,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -1011,8 +1091,8 @@ function importData(e){
       if(d.prs)prs=d.prs;if(d.logs)logs=d.logs;
       if(d.progRate)progRate=d.progRate;if(d.curWeek!=null)curWeek=d.curWeek;
       if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
-      if(d.lang)lang=d.lang;
-      lset('prs',prs);lset('logs',logs);lset('rate',progRate);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);
+      if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
+      lset('prs',prs);lset('logs',logs);lset('rate',progRate);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);
       applyLang();renderHeader();renderToday();renderPRInputs();
       toast(L().imported);
     }catch(err){toast(L().importErr);}
