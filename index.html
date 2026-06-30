@@ -165,6 +165,7 @@ select.pinp{appearance:none;}
         <button class="abtn" onclick="changeDay(1)">&#8250;</button>
       </div>
     </div>
+    <div class="frow" id="COND_ROW" style="margin-bottom:10px;"></div>
     <div id="VOL_BANNER"></div>
     <div id="EX_LIST"></div>
     <button class="ghostb" id="BTN_TIMER" onclick="toggleTimer()" style="margin-top:10px;"></button>
@@ -336,7 +337,7 @@ var EX_DEFS = [
   ],
   // Day 3 - Wed/Thu: Speed (40-50%)
   [
-    {prKey:'snatch',     pct:0.45, sets:4, rest:90,  drv:null, acc:false, autoReps:true},
+    {prKey:'snatch',     pct:0.50, sets:4, rest:90,  drv:null, acc:false, autoReps:true},
     {prKey:'deadlift',   pct:0.50, sets:3, rest:90,  drv:null, acc:false, autoReps:true},
     {prKey:'squat',      pct:0.45, sets:3, rest:90,  drv:null, acc:false, autoReps:true},
     {prKey:'press',      pct:0.45, sets:3, rest:90,  drv:null, acc:false, autoReps:true}
@@ -495,6 +496,7 @@ var curFilter='all', chartInst=null;
 var tTotal=120,tLeft=120,tRun=false,tInt=null,tOpen=false;
 var calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel=null;
 var tmpDows=[].concat(wDows);
+var dayCondMult=1.0;
 
 // ===== HELPERS =====
 function L(){return LNG[lang];}
@@ -507,8 +509,9 @@ function getMainTestLift(dayIdx){
   if(dayIdx===2) return 'cleanjerk';   // Day 3 C&J focus
   return null;                          // Day 2,4 little days - no test
 }
-function calcW(ex,wk){
+function calcW(ex,wk,extraMult){
   if(ex.prKey==='none'||ex.pct===0) return 0;
+  extraMult = extraMult||1;
   var basePR;
   if(ex.drv){
     basePR = roundW(getPR(ex.drv.fromKey)*ex.drv.fromPct/100);
@@ -516,11 +519,11 @@ function calcW(ex,wk){
     basePR = getPR(ex.prKey);
   }
   var mult = 1 + wk*(progRate/100);
-  return roundW(basePR*ex.pct*mult);
+  return roundW(basePR*ex.pct*mult*extraMult);
 }
 function isBodyweight(ex){ return ex.prKey==='none'||ex.pct===0; }
 function isAccessory(ex){ return ex.acc===true; }
-function getEffectivePct(ex,wk){ return ex.pct*(1+wk*(progRate/100)); }
+function getEffectivePct(ex,wk,extraMult){ return ex.pct*(1+wk*(progRate/100))*(extraMult||1); }
 function getAutoReps(effPct){
   if(effPct>=0.85) return 1;
   if(effPct>=0.75) return 2;
@@ -528,8 +531,8 @@ function getAutoReps(effPct){
   if(effPct>=0.55) return 4;
   return 5;
 }
-function getDisplayReps(ex,wk){
-  if(ex.autoReps) return getAutoReps(getEffectivePct(ex,wk));
+function getDisplayReps(ex,wk,extraMult){
+  if(ex.autoReps) return getAutoReps(getEffectivePct(ex,wk,extraMult));
   return ex.reps;
 }
 function getWeekMult(i){return 1+i*(progRate/100);}
@@ -599,6 +602,25 @@ function setLang(lg){
 }
 
 // ===== HEADER =====
+var CONDITIONS=[
+  {v:0.90, ko:'가볍게 -10%', en:'Light -10%'},
+  {v:1.00, ko:'보통', en:'Normal'},
+  {v:1.05, ko:'무겁게 +5%', en:'Heavy +5%'}
+];
+function setCondition(v){
+  dayCondMult=v;
+  renderCondRow();
+  renderToday();
+}
+function renderCondRow(){
+  var el=document.getElementById('COND_ROW');
+  if(!el) return;
+  el.innerHTML=CONDITIONS.map(function(c){
+    var active=Math.abs(c.v-dayCondMult)<0.001;
+    var lbl=lang==='ko'?c.ko:c.en;
+    return '<button class="fbtn'+(active?' active':'')+'" onclick="setCondition('+c.v+')">'+lbl+'</button>';
+  }).join('');
+}
 function renderHeader(){
   var mult=getWeekMult(curWeek);
   document.getElementById('H_SUB').textContent=L().weekLabels[curWeek]+' · '+L().intensityLabel+' '+Math.round(mult*100)+'%';
@@ -608,9 +630,10 @@ function renderHeader(){
 // Prilepin chart: optimal rep ranges per intensity zone for Olympic lifts
 // Zone: [minPct, maxPct, repsPerSet_opt, totalReps_min, totalReps_opt, totalReps_max]
 var PRILEPIN = [
-  [0.55, 0.65, 6, 18, 24, 30],
-  [0.70, 0.75, 6, 12, 18, 24],
-  [0.80, 0.85, 4, 10, 15, 20],
+  [0.50, 0.54, 5, 15, 20, 25],
+  [0.55, 0.69, 6, 18, 24, 30],
+  [0.70, 0.79, 6, 12, 18, 24],
+  [0.80, 0.89, 4, 10, 15, 20],
   [0.90, 1.00, 2,  4,  7, 10]
 ];
 function getPrilepinZone(pct){
@@ -647,12 +670,13 @@ function renderVolumeBanner(){
   var v=calcDayVolume(curDay,curWeek);
   var banner=document.getElementById('VOL_BANNER');
   if(!banner) return;
-  var priPct=(v.prilepinMax>0&&v.prilepinReps>0)?Math.min(110,Math.round(v.prilepinReps/v.prilepinMax*100)):0;
-  var barColor=priPct<60?'var(--r)':priPct>100?'#BA7517':'var(--g)';
-  var statusText=priPct<60?(l.volLow||'부족'):(priPct>110?(l.volHigh||'과임'):(l.volOk||'적정'));
-  var statusBg=priPct<60?'rgba(226,75,74,.12)':priPct>110?'rgba(186,117,23,.12)':'rgba(29,158,117,.12)';
-  var statusColor=priPct<60?'var(--r)':priPct>110?'#BA7517':'var(--g)';
-  if(lang==='en'){statusText=priPct<60?'Low':priPct>110?'High':'OK';}
+  var hasZone=v.prilepinMax>0;
+  var priPct=(hasZone&&v.prilepinReps>0)?Math.min(110,Math.round(v.prilepinReps/v.prilepinMax*100)):0;
+  var barColor=!hasZone?'var(--tx3)':priPct<60?'var(--r)':priPct>100?'#BA7517':'var(--g)';
+  var statusText=!hasZone?(lang==='ko'?'해당없음':'N/A'):priPct<60?(l.volLow||'부족'):(priPct>110?(l.volHigh||'과임'):(l.volOk||'적정'));
+  var statusBg=!hasZone?'rgba(153,153,153,.12)':priPct<60?'rgba(226,75,74,.12)':priPct>110?'rgba(186,117,23,.12)':'rgba(29,158,117,.12)';
+  var statusColor=!hasZone?'var(--tx3)':priPct<60?'var(--r)':priPct>110?'#BA7517':'var(--g)';
+  if(lang==='en'&&hasZone){statusText=priPct<60?'Low':priPct>110?'High':'OK';}
   banner.innerHTML=
     '<div class="vol-item">'+
       '<span class="vol-label">'+(lang==='ko'?'일일 총볼륨':'총 볼륨')+'</span>'+
@@ -668,15 +692,16 @@ function renderVolumeBanner(){
     '</div>'+
     '<div class="vol-item" style="min-width:100%;margin-top:2px;">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
-        '<span class="vol-label">Prilepin '+(lang==='ko'?'적정 범위':'range')+' ('+v.prilepinMin+'~'+v.prilepinMax+' reps)</span>'+
+        '<span class="vol-label">Prilepin '+(lang==='ko'?'적정 범위':'range')+' ('+(hasZone?(v.prilepinMin+'~'+v.prilepinMax+' reps'):'—')+')</span>'+
         '<span class="vol-status" style="background:'+statusBg+';color:'+statusColor+'">'+statusText+'</span>'+
       '</div>'+
       '<div class="vol-bar-track"><div class="vol-bar-fill" style="width:'+Math.min(priPct,100)+'%;background:'+barColor+';"></div></div>'+
-      '<div style="font-size:10px;color:var(--tx2);margin-top:3px;">'+(lang==='ko'?'주종목 '+v.prilepinReps+'렌 / 기준 '+v.prilepinMax+'렌':'Main lifts '+v.prilepinReps+' reps / target '+v.prilepinMax)+'</div>'+
+      '<div style="font-size:10px;color:var(--tx2);margin-top:3px;">'+(!hasZone?(lang==='ko'?'이 날은 Prilepin 기준 범위를 벗어난 강도예요 (스피드/회복 위주)':'Intensity outside Prilepin chart range (speed/recovery day)'):(lang==='ko'?'주종목 '+v.prilepinReps+'렙 / 기준 '+v.prilepinMax+'렙':'Main lifts '+v.prilepinReps+' reps / target '+v.prilepinMax))+'</div>'+
     '</div>';
 }
 function renderToday(){
   var l=L();
+  renderCondRow();
   var dd=l.dayDefs[curDay];
   document.getElementById('D_TITLE').textContent=dd.title;
   var dow=wDows[curDay];
@@ -727,7 +752,7 @@ function renderToday(){
 
   EX_DEFS[curDay].forEach(function(ex,ei){
     var exName=l.exNames2[curDay][ei];
-    var w=calcW(ex,curWeek);
+    var w=calcW(ex,curWeek,dayCondMult);
     var bw=isBodyweight(ex);
     var acc=isAccessory(ex);
 
@@ -752,7 +777,7 @@ function renderToday(){
     var chipHtml=bw
       ?'<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span>'
       :'<span class="wchip">'+w+' kg</span>';
-    var repsDisp=ex.reps==='0'?('30s'):getDisplayReps(ex,curWeek);
+    var repsDisp=ex.reps==='0'?('30s'):getDisplayReps(ex,curWeek,dayCondMult);
 
     var srow=document.createElement('div');
     srow.className='srow';
@@ -790,7 +815,7 @@ function tapSet(ds,di,ei,si,rest){
   if(document.getElementById('screen-cal').classList.contains('active'))renderCalDet(ds);
   if(setStates[k]==='d')openTimer(rest);
 }
-function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
+function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);dayCondMult=1.0;renderToday();}
 function resetToToday(){var auto=detectTodayDayIdx();if(auto!==null){curDay=auto;renderToday();}}
 function cycleWeek(){curWeek=(curWeek+1)%4;lset('week',curWeek);renderHeader();renderToday();toast(L().weekLabels[curWeek]);}
 function confirmResetAll(){
