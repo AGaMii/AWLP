@@ -140,6 +140,8 @@ select.pinp{appearance:none;}
 .tipdesc b{color:var(--g);}
 .tiphl{outline:2px solid var(--g);outline-offset:2px;border-radius:8px;}
 .cuebadge{display:inline-block;font-size:10px;font-weight:700;background:var(--gl);color:var(--gd);border-radius:4px;padding:2px 7px;}
+.adjb-sm{width:26px!important;height:26px!important;font-size:15px!important;padding:0!important;flex-shrink:0;}
+.exm b{color:var(--tx);font-size:13px;}
 @media(prefers-color-scheme:dark){.cuebadge{background:#0F6E56;color:#9FE1CB;}}
 </style>
 </head>
@@ -149,7 +151,10 @@ select.pinp{appearance:none;}
     <div class="hdr-title" id="H_TITLE"><i class="ti ti-barbell"></i> 역도 트레이너</div>
     <div class="hdr-sub" id="H_SUB"></div>
   </div>
-  <button class="hdr-btn" id="H_NEXT" onclick="cycleWeek()">다음 주</button>
+  <div style="display:flex;gap:6px;">
+    <button class="hdr-btn" id="H_PREV" onclick="cycleWeek(-1)">이전 주</button>
+    <button class="hdr-btn" id="H_NEXT" onclick="cycleWeek(1)">다음 주</button>
+  </div>
 </div>
 
 <div class="scroll">
@@ -162,9 +167,38 @@ select.pinp{appearance:none;}
         <button class="abtn" onclick="changeDay(1)">&#8250;</button>
       </div>
     </div>
-    <div class="frow" id="COND_ROW" style="margin-bottom:10px;"></div>
     <div class="card" id="VOL_BANNER" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;"></div>
+    <div class="card" id="WARM_SECTION" style="padding:14px;">
+      <div class="ct"><i class="ti ti-flame"></i> <span id="WARM_TITLE"></span></div>
+      <div id="WARM_LIST"></div>
+      <button class="ghostb" id="BTN_ADD_WARM" onclick="toggleExtraPicker('warm')"></button>
+      <div id="PICKER_warm" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;" id="LIB_TITLE_warm"></div>
+        <div class="frow" id="CHIPS_warm" style="flex-wrap:wrap;overflow-x:visible;"></div>
+        <div style="font-size:11px;color:var(--tx2);margin:10px 0 6px;" id="CUSTOM_TITLE_warm"></div>
+        <div class="prow">
+          <input class="pinp" id="CUSTOM_NAME_warm" type="text">
+          <button class="gbtn" style="width:auto;margin-top:0;padding:0 16px;" id="BTN_CUSTOM_warm" onclick="addCustomExtra('warm')"></button>
+        </div>
+        <button class="ghostb" id="BTN_CLOSE_warm" onclick="toggleExtraPicker('warm')"></button>
+      </div>
+    </div>
     <div id="EX_LIST"></div>
+    <div class="card" id="ACC_SECTION" style="padding:14px;">
+      <div class="ct"><i class="ti ti-plus"></i> <span id="ACC_TITLE"></span></div>
+      <div id="ACC_LIST"></div>
+      <button class="ghostb" id="BTN_ADD_ACC" onclick="toggleExtraPicker('acc')"></button>
+      <div id="PICKER_acc" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;" id="LIB_TITLE_acc"></div>
+        <div class="frow" id="CHIPS_acc" style="flex-wrap:wrap;overflow-x:visible;"></div>
+        <div style="font-size:11px;color:var(--tx2);margin:10px 0 6px;" id="CUSTOM_TITLE_acc"></div>
+        <div class="prow">
+          <input class="pinp" id="CUSTOM_NAME_acc" type="text">
+          <button class="gbtn" style="width:auto;margin-top:0;padding:0 16px;" id="BTN_CUSTOM_acc" onclick="addCustomExtra('acc')"></button>
+        </div>
+        <button class="ghostb" id="BTN_CLOSE_acc" onclick="toggleExtraPicker('acc')"></button>
+      </div>
+    </div>
     <button class="gbtn" id="BTN_SAVEDAY" onclick="saveTodayToGraph()"></button>
     <button class="ghostb" id="BTN_TIMER" onclick="toggleTimer()" style="margin-top:10px;"></button>
     <div class="tsec" id="TIMER_SEC" style="display:none;">
@@ -324,7 +358,39 @@ select.pinp{appearance:none;}
 // ============================================================
 var DIRECT_KEYS=['snatch','cleanjerk','squat','frontsquat','press'];
 var DEFAULTS={snatch:80,cleanjerk:105,squat:140,frontsquat:120,press:75};
-var EX_COLORS={snatch:'#1D9E75',cleanjerk:'#378ADD',squat:'#7F77DD',frontsquat:'#9B59B6',press:'#BA7517'};
+var EX_COLORS={snatch:'#1D9E75',cleanjerk:'#378ADD',squat:'#7F77DD',frontsquat:'#9B59B6',press:'#BA7517',ohs:'#2EA8A8',eccdl:'#D4548A',powersn:'#6FCF97',powercj:'#56B4E0'};
+var EXTRA_PALETTE=['#E67E22','#8E44AD','#16A085','#C0392B','#2C3E50','#27AE60','#D35400','#7F8C8D'];
+function colorFor(key){
+  if(EX_COLORS[key])return EX_COLORS[key];
+  var h=0;for(var i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;
+  return EXTRA_PALETTE[h%EXTRA_PALETTE.length];
+}
+
+// preset library for user-added exercises (Today screen, ad-hoc)
+// cat:'warm' (session prep, before main) | 'acc' (finisher/hypertrophy, after main)
+// sets/reps: defaults from common weightlifting practice; pril: base lift for Prilepin counting (barbell snatch/clean derivatives only)
+var EXTRA_LIB=[
+ // ---- 웜업 (본운동 전) ----
+ {id:'emptybar',ko:'빈봉 스내치 콤플렉스',en:'Empty-Bar Snatch Complex',cat:'warm',sets:2,reps:5,pril:null,nk:'풀+하이풀+머슬스내치+OHS 연결',ne:'Pull+high pull+muscle snatch+OHS flow'},
+ {id:'muscsn',ko:'머슬 스내치',en:'Muscle Snatch',cat:'warm',sets:3,reps:5,pril:'snatch',nk:'가볍게, 팔꿈치 높게 터닝오버 연습',ne:'Light; drill high-elbow turnover'},
+ {id:'bnp',ko:'비하인드 넥 프레스(스내치그립)',en:'Snatch-Grip BN Press',cat:'warm',sets:3,reps:8,pril:null,nk:'어깨·등상부 활성화',ne:'Shoulder/upper-back activation'},
+ {id:'gm',ko:'굿모닝',en:'Good Morning',cat:'warm',sets:3,reps:8,pril:null,nk:'햄스트링·등 하부 준비',ne:'Prime hamstrings & lower back'},
+ {id:'boxjump',ko:'박스 점프',en:'Box Jump',cat:'warm',sets:3,reps:3,pril:null,nk:'CNS 활성화, 최대 높이 아님',ne:'CNS priming, not max height'},
+ {id:'sotts',ko:'솟츠 프레스',en:'Sotts Press',cat:'warm',sets:2,reps:5,pril:null,nk:'바닥 자세 오버헤드 가동성',ne:'Overhead mobility in the bottom'},
+ // ---- 보조·마무리 (본운동 후) ----
+ {id:'jumpsq',ko:'점프 스쿼트',en:'Jump Squat',cat:'acc',sets:4,reps:5,pril:null,nk:'가벼운 중량(체중~25%)으로 폭발력',ne:'Light load (~25% BW) for power'},
+ {id:'pindl',ko:'핀 데드리프트(무릎 위)',en:'Pin Deadlift (above knee)',cat:'acc',sets:3,reps:3,pril:'cleanjerk',nk:'무릎 위 랙에서 시작, 과부하 풀',ne:'Start from pins above knee; overload pull'},
+ {id:'pinsq',ko:'핀 스쿼트',en:'Pin Squat',cat:'acc',sets:3,reps:3,pril:null,nk:'바닥 정지 구간 스트렝스',ne:'Dead-stop strength out of the hole'},
+ {id:'hrsq',ko:'고반복 백 스쿼트',en:'High-Rep Back Squat',cat:'acc',sets:2,reps:18,pril:null,nk:'가벼운 중량 18~20회, 세트간 60~90초',ne:'Light, 18-20 reps, 60-90s rest'},
+ {id:'row',ko:'바벨 로우',en:'Barbell Row',cat:'acc',sets:4,reps:8,pril:null,nk:'풀 균형용 등 두께',ne:'Back thickness to balance pulling'},
+ {id:'bbext',ko:'바벨 익스텐션',en:'Barbell Extension',cat:'acc',sets:3,reps:10,pril:null,nk:'저크 락아웃용 삼두',ne:'Triceps for jerk lockout'},
+ {id:'sgrdl',ko:'스내치그립 RDL',en:'Snatch-Grip RDL',cat:'acc',sets:3,reps:6,pril:null,nk:'후면사슬 + 등 상부 유지력',ne:'Posterior chain + upper-back hold'},
+ {id:'sldl',ko:'스티프레그 데드리프트',en:'Stiff-Leg Deadlift',cat:'acc',sets:3,reps:8,pril:null,nk:'햄스트링 보강',ne:'Hamstring builder'},
+ {id:'pullup',ko:'풀업',en:'Pull-up',cat:'acc',sets:3,reps:8,pril:null,nk:'',ne:''},
+ {id:'hlr',ko:'행잉 레그레이즈',en:'Hanging Leg Raise',cat:'acc',sets:3,reps:12,pril:null,nk:'',ne:''},
+ {id:'plank',ko:'플랭크',en:'Plank',cat:'acc',sets:3,reps:45,pril:null,nk:'횟수=초',ne:'reps = seconds'},
+ {id:'coreab',ko:'앱휠/코어',en:'Ab Wheel / Core',cat:'acc',sets:3,reps:10,pril:null,nk:'',ne:''}
+];
 
 // exercise factory: E(nameKO,nameEN,baseLift,pct,repsLabel,sets,restSec,tipId,graphKey,noteKO,noteEN)
 function E(nk,ne,base,pct,reps,sets,rest,tip,log,noK,noE){return{nk:nk,ne:ne,base:base,pct:pct,reps:reps,sets:sets,rest:rest,tip:tip||null,log:log||null,noK:noK||null,noE:noE||null};}
@@ -337,23 +403,20 @@ var B1=[
  {sk:'인상 기술 & 백 스쿼트',se:'Snatch technique & back squat',ex:[
    E('스내치','Snatch','snatch',.75,'3',5,150,'lift','snatch'),
    E('세그먼트 스내치 풀','Segment Snatch Pull','snatch',.75,'3',4,150,'segpull',null,'무릎 위 3초 정지 후 폭발','3s pause above knee, then explode'),
-   E('백 스쿼트','Back Squat','squat',.80,'4',4,210,'squat','squat'),
-   A('플랭크','Plank','3×45초','3×45s')]},
+   E('백 스쿼트','Back Squat','squat',.80,'4',4,210,'squat','squat')]},
  {sk:'용상 기술 & 상체 스트렝스',se:'C&J technique & upper strength',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.80,'2+1',5,180,'lift','cleanjerk','클린 2회 + 저크 1회','2 cleans + 1 jerk'),
    E('클린 풀','Clean Pull','cleanjerk',.90,'2',4,150,'pull'),
-   E('푸시 프레스','Push Press','press',.75,'4',4,210,'press','press'),
-   A('풀업','Pull-up','3세트','3 sets')]},
+   E('푸시 프레스','Push Press','press',.75,'4',4,210,'press','press')]},
  {sk:'무릎 위 약점 타격 ★',se:'Above-knee weakness day ★',ex:[
    E('3-Position 스내치 하이풀 + 스내치','3-Position Snatch High Pull + Snatch','snatch',.65,'3+1',4,180,'3pos','snatch','포켓 → 무릎 위 2초 → 바닥 → 스내치','Pocket, above-knee 2s hold, floor, then snatch'),
    E('스내치 밸런스','Snatch Balance','snatch',.75,'2',4,150,'balance'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.85,'3',4,210,'squat','frontsquat'),
-   A('행잉 레그레이즈','Hanging Leg Raise','3세트','3 sets')]},
+   E('프론트 스쿼트','Front Squat','frontsquat',.85,'3',4,210,'squat','frontsquat')]},
  {sk:'파워 용상 & 네거티브',se:'Power C&J & negatives',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'2+2',4,180,'power'),
+   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'2+2',4,180,'power','powercj'),
    E('저크 드라이브','Jerk Drive','cleanjerk',.95,'2',3,210,'jerkdrive'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'3',4,150,'ohs'),
-   E('익센트릭 역도 데드리프트','Eccentric WL Deadlift','cleanjerk',.90,'4',3,150,'eccdl',null,'무릎 위 구간 4~5초 버티며 하강','Lower 4-5s through the above-knee zone')]}
+   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'3',4,150,'ohs','ohs'),
+   E('익센트릭 역도 데드리프트','Eccentric WL Deadlift','cleanjerk',.90,'4',3,150,'eccdl','eccdl','무릎 위 구간 4~5초 버티며 하강','Lower 4-5s through the above-knee zone')]}
 ];
 
 var DL=[
@@ -369,8 +432,8 @@ var DL=[
    E('3-Position 스내치 하이풀 + 스내치','3-Position Snatch High Pull + Snatch','snatch',.55,'3+1',3,150,'3pos'),
    E('프론트 스쿼트','Front Squat','frontsquat',.70,'3',3,180,'squat','frontsquat')]},
  {sk:'디로딩 · 파워',se:'Deload · power',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.60,'1+1',3,150,'power'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.55,'2',3,120,'ohs')]}
+   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.60,'1+1',3,150,'power','powercj'),
+   E('오버헤드 스쿼트','Overhead Squat','snatch',.55,'2',3,120,'ohs','ohs')]}
 ];
 
 var B2=[
@@ -381,16 +444,14 @@ var B2=[
  {sk:'용상 강도 상향',se:'C&J intensity up',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.85,'1+1',5,180,'lift','cleanjerk'),
    E('클린 풀','Clean Pull','cleanjerk',1.00,'2',3,180,'pull',null,'무겁게 뽑는 연습','Heavy pulling practice'),
-   E('푸시 프레스','Push Press','press',.80,'3',4,210,'press','press'),
-   A('풀업','Pull-up','3세트','3 sets')]},
+   E('푸시 프레스','Push Press','press',.80,'3',4,210,'press','press')]},
  {sk:'포지션 스내치 & 프론트',se:'Position snatch & front squat',ex:[
    E('스내치','Snatch','snatch',.75,'3',5,150,'lift','snatch','강해진 포지션으로 바닥에서 정식 수행','Full lift from the floor with the improved position'),
    E('스내치 밸런스','Snatch Balance','snatch',.80,'2',3,150,'balance'),
    E('프론트 스쿼트','Front Squat','frontsquat',.90,'2',4,210,'squat','frontsquat')]},
  {sk:'파워 & 오버헤드',se:'Power & overhead',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.80,'1+1',5,180,'power'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.80,'2',4,150,'ohs'),
-   A('코어 운동','Core work','3세트','3 sets')]}
+   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.80,'1+1',5,180,'power','powercj'),
+   E('오버헤드 스쿼트','Overhead Squat','snatch',.80,'2',4,150,'ohs','ohs')]}
 ];
 
 var W9=[
@@ -407,8 +468,8 @@ var W9=[
    E('스내치 밸런스','Snatch Balance','snatch',.75,'2',3,150,'balance'),
    E('프론트 스쿼트','Front Squat','frontsquat',.95,'2',2,240,'squat','frontsquat')]},
  {sk:'파워 유지',se:'Power maintain',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'1+1',4,180,'power'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.75,'2',3,150,'ohs')]}
+   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'1+1',4,180,'power','powercj'),
+   E('오버헤드 스쿼트','Overhead Squat','snatch',.75,'2',3,150,'ohs','ohs')]}
 ];
 
 var W10=[
@@ -424,8 +485,8 @@ var W10=[
    E('스내치','Snatch','snatch',.80,'1',5,180,'lift'),
    E('프론트 스쿼트','Front Squat','frontsquat',.85,'2',3,210,'squat','frontsquat')]},
  {sk:'가볍게 유지',se:'Light maintain',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.70,'1+1',3,150,'power'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'2',3,120,'ohs')]}
+   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.70,'1+1',3,150,'power','powercj'),
+   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'2',3,120,'ohs','ohs')]}
 ];
 
 var W11=[
@@ -436,11 +497,9 @@ var W11=[
    LAD('클린 앤 저크 — 신기록 도전','Clean & Jerk — new PR attempt','cleanjerk'),
    E('프론트 스쿼트','Front Squat','frontsquat',.65,'2',2,150,'squat')]},
  {sk:'회복',se:'Recovery',ex:[
-   E('파워 스내치','Power Snatch','snatch',.65,'2',3,120,'power'),
-   A('코어 운동','Core work','3세트','3 sets')]},
+   E('파워 스내치','Power Snatch','snatch',.65,'2',3,120,'power','powersn')]},
  {sk:'회복',se:'Recovery',ex:[
-   E('파워 클린','Power Clean','cleanjerk',.65,'2',3,120,'power'),
-   A('코어 운동','Core work','3세트','3 sets')]}
+   E('파워 클린','Power Clean','cleanjerk',.65,'2',3,120,'power','powercj')]}
 ];
 
 var W12=[
@@ -451,9 +510,9 @@ var W12=[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.60,'1+1',3,120,'lift'),
    E('푸시 프레스','Push Press','press',.60,'3',3,120,'press')]},
  {sk:'회복 & 리셋',se:'Recovery & reset',ex:[
-   E('파워 스내치','Power Snatch','snatch',.55,'2',3,120,'power')]},
+   E('파워 스내치','Power Snatch','snatch',.55,'2',3,120,'power','powersn')]},
  {sk:'회복 & 리셋',se:'Recovery & reset',ex:[
-   E('파워 클린','Power Clean','cleanjerk',.55,'2',3,120,'power','',null,'새 PR을 설정 탭에 저장하고 1주차부터 재시작','Save new PRs in Settings, then restart at Week 1')]}
+   E('파워 클린','Power Clean','cleanjerk',.55,'2',3,120,'power','powercj',null,'새 PR을 설정 탭에 저장하고 1주차부터 재시작','Save new PRs in Settings, then restart at Week 1')]}
 ];
 
 var NOTE_B1_K='블록 1 (1~4주) — 무릎 위 약점을 인지하고, 프릴레핀 최적 볼륨으로 바벨 스피드를 극대화하는 기술 축적 구간. 자세가 무너지면 그 세트는 즉시 종료하세요.';
@@ -586,9 +645,12 @@ var LNG={
   drvTitle:'파생 중량 자동 계산 (현재 입력값 기준)',
   btnSaveDay:'📈 훈련 기록 그래프로 저장',savedDay:'개 종목 기록 저장됨',savedNone:'완료(초록) 표시된 세트가 없어요',
   trainTag:'훈련',prTag:'PR',
-  exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스'},
+  exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스',ohs:'오버헤드 스쿼트',eccdl:'익센트릭 DL',powersn:'파워 스내치',powercj:'파워 클린(+저크)'},
   logOpts:[{v:'snatch',l:'스내치'},{v:'cleanjerk',l:'클린&저크'},{v:'squat',l:'백 스쿼트'},{v:'frontsquat',l:'프론트 스쿼트'},{v:'press',l:'푸시 프레스'}],
-  gFilters:[{k:'all',l:'전체'},{k:'snatch',l:'스내치'},{k:'cleanjerk',l:'클린&저크'},{k:'squat',l:'백스쿼트'},{k:'frontsquat',l:'프론트'},{k:'press',l:'푸시프레스'}],
+  gFilters:[{k:'all',l:'전체'},{k:'snatch',l:'스내치'},{k:'cleanjerk',l:'클린&저크'},{k:'squat',l:'백스쿼트'},{k:'frontsquat',l:'프론트'},{k:'press',l:'푸시프레스'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'익센트릭DL'},{k:'powersn',l:'파워스내치'},{k:'powercj',l:'파워클린'}],
+  extraTitle:'추가 운동',addExtraBtn:'+ 운동 추가',customPh:'운동 이름 직접 입력',addBtn:'추가',extraWtPh:'중량',setsLbl:'세트',repsLbl:'횟수',extraNone:'추가된 운동이 없어요',customTitle:'직접 입력',closePicker:'닫기',
+  warmTitle:'웜업 운동',accTitle:'보조·마무리 운동',warmLibTitle:'추천 웜업',accLibTitle:'추천 보조·마무리',
+  prevWeek:'이전 주',adjReset:'원래대로',prilFrom:'보조 포함',prilSaveMsg:'Prilepin',
   condL:'가볍게 -10%',condN:'보통',condH:'무겁게 +5%',
   ladderReps:'1회씩 3시도',accBadge:'보조'},
  en:{appTitle:'WL Trainer',nextWeek:'Next Week',
@@ -614,9 +676,12 @@ var LNG={
   drvTitle:'Derived weights (from current inputs)',
   btnSaveDay:'📈 Save session to graph',savedDay:'lifts saved',savedNone:'No sets marked done (green) yet',
   trainTag:'train',prTag:'PR',
-  exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press'},
+  exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press',ohs:'Overhead Squat',eccdl:'Eccentric DL',powersn:'Power Snatch',powercj:'Power Clean(+Jerk)'},
   logOpts:[{v:'snatch',l:'Snatch'},{v:'cleanjerk',l:'Clean & Jerk'},{v:'squat',l:'Back Squat'},{v:'frontsquat',l:'Front Squat'},{v:'press',l:'Push Press'}],
-  gFilters:[{k:'all',l:'All'},{k:'snatch',l:'Snatch'},{k:'cleanjerk',l:'C&J'},{k:'squat',l:'Back Sq'},{k:'frontsquat',l:'Front Sq'},{k:'press',l:'Press'}],
+  gFilters:[{k:'all',l:'All'},{k:'snatch',l:'Snatch'},{k:'cleanjerk',l:'C&J'},{k:'squat',l:'Back Sq'},{k:'frontsquat',l:'Front Sq'},{k:'press',l:'Press'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'Ecc DL'},{k:'powersn',l:'Pwr Snatch'},{k:'powercj',l:'Pwr Clean'}],
+  extraTitle:'Extra Exercises',addExtraBtn:'+ Add Exercise',customPh:'Type exercise name',addBtn:'Add',extraWtPh:'Weight',setsLbl:'sets',repsLbl:'reps',extraNone:'No exercises added',customTitle:'Custom',closePicker:'Close',
+  warmTitle:'Warm-up',accTitle:'Accessories / Finishers',warmLibTitle:'Suggested warm-ups',accLibTitle:'Suggested accessories',
+  prevWeek:'Prev Week',adjReset:'Reset',prilFrom:'incl. extras',prilSaveMsg:'Prilepin',
   condL:'Light -10%',condN:'Normal',condH:'Heavy +5%',
   ladderReps:'3 attempts x1',accBadge:'ACC'}
 };
@@ -636,7 +701,6 @@ var curFilter='all',chartInst=null;
 var tTotal=150,tLeft=150,tRun=false,tInt=null,tOpen=false;
 var calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel=null;
 var tmpDows=[].concat(wDows);
-var dayCondMult=1.0;
 
 // ===== HELPERS =====
 function L(){return LNG[lang];}
@@ -661,12 +725,17 @@ function setKey(ds,di,ei,si){return ds+'-'+di+'-'+ei+'-'+si;}
 function dateWorkoutDay(date){var d=date.getDay();var i=wDows.indexOf(d);return i===-1?null:i;}
 function hasLog(ds){return Object.keys(setStates).some(function(k){return k.indexOf(ds)===0&&(setStates[k]==='d'||setStates[k]==='f');});}
 function isPRWeek(){return curWeek===10;}
+function getExtras(ds){return lget('extra_'+ds,[]);}
+function setExtras(ds,arr){lset('extra_'+ds,arr);}
+function extraSetKey(ds,uid,si){return ds+'-X'+uid+'-'+si;}
+function slugify(s){return 'c_'+s.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30)||'c_ex';}
 
 // ===== APPLY LANGUAGE =====
 function applyLang(){
   var l=L();
   document.getElementById('H_TITLE').innerHTML='<i class="ti ti-barbell"></i> '+l.appTitle;
   document.getElementById('H_NEXT').textContent=l.nextWeek;
+  document.getElementById('H_PREV').textContent=l.prevWeek;
   ['N_TODAY','N_CAL','N_GRAPH','N_TIPS','N_PROG','N_SET'].forEach(function(id,i){
     document.getElementById(id).textContent=[l.nToday,l.nCal,l.nGraph,l.nTips,l.nProg,l.nSet][i];
   });
@@ -692,6 +761,19 @@ function applyLang(){
   document.getElementById('BTN_TIMER').textContent=l.tOpen;
   document.getElementById('T_BTN').textContent=tRun?l.tPause:l.tStart;
   document.getElementById('BTN_SAVEDAY').textContent=l.btnSaveDay;
+  document.getElementById('WARM_TITLE').textContent=l.warmTitle;
+  document.getElementById('ACC_TITLE').textContent=l.accTitle;
+  document.getElementById('BTN_ADD_WARM').textContent=l.addExtraBtn;
+  document.getElementById('BTN_ADD_ACC').textContent=l.addExtraBtn;
+  document.getElementById('LIB_TITLE_warm').textContent=l.warmLibTitle;
+  document.getElementById('LIB_TITLE_acc').textContent=l.accLibTitle;
+  ['warm','acc'].forEach(function(cat){
+    document.getElementById('CUSTOM_TITLE_'+cat).textContent=l.customTitle;
+    document.getElementById('CUSTOM_NAME_'+cat).placeholder=l.customPh;
+    document.getElementById('BTN_CUSTOM_'+cat).textContent=l.addBtn;
+    document.getElementById('BTN_CLOSE_'+cat).textContent=l.closePicker;
+    if(pickerState[cat])renderExtraChips(cat);
+  });
   document.getElementById('G_ADD').textContent=l.gAdd;
   document.getElementById('G_EX_L').textContent=l.gExL;
   document.getElementById('G_WT_L').textContent=l.gWtL;
@@ -715,39 +797,72 @@ function setLang(lg){
   if(document.getElementById('screen-graph').classList.contains('active')){renderGFilters();renderGraph();}
 }
 
-// ===== CONDITION =====
-function setCondition(v){dayCondMult=v;renderToday();}
-function renderCondRow(){
-  var l=L();
-  var C=[{v:0.90,t:l.condL},{v:1.00,t:l.condN},{v:1.05,t:l.condH}];
-  document.getElementById('COND_ROW').innerHTML=C.map(function(c){
-    var a=Math.abs(c.v-dayCondMult)<0.001;
-    return '<button class="fbtn'+(a?' active':'')+'" onclick="setCondition('+c.v+')">'+c.t+'</button>';
-  }).join('');
+// ===== PER-DAY EXERCISE ADJUSTMENTS (weight ±roundUnit, sets ±1, reps ±1) =====
+function adjStore(ds){return lget('madj_'+ds,{});}
+function getAdj(ds,di,ei){var a=adjStore(ds);return a[di+'-'+ei]||{};}
+function saveAdj(ds,di,ei,obj){
+  var a=adjStore(ds);
+  if(!obj.w&&!obj.s&&!obj.r)delete a[di+'-'+ei];
+  else a[di+'-'+ei]=obj;
+  lset('madj_'+ds,a);
 }
+function repsIsNumeric(r){return String(r).indexOf('+')===-1;}
+function effW(ex,adj){return Math.max(20,roundW(getPR(ex.base)*ex.pct)+(adj.w||0));}
+function effSets(ex,adj){return Math.max(1,Math.min(10,ex.sets+(adj.s||0)));}
+function effReps(ex,adj){
+  if(!repsIsNumeric(ex.reps))return ex.reps;
+  return String(Math.max(1,Math.min(30,(parseInt(ex.reps)||1)+(adj.r||0))));
+}
+function bumpAdj(di,ei,field,delta){
+  var ds=todayStr();
+  var ex=W().days[di].ex[ei];
+  var adj=getAdj(ds,di,ei);
+  if(field==='w'){adj.w=(adj.w||0)+delta*roundUnit;if(roundW(getPR(ex.base)*ex.pct)+adj.w<20)adj.w=20-roundW(getPR(ex.base)*ex.pct);if(Math.abs(adj.w)<0.001)adj.w=0;}
+  if(field==='s'){var ns=ex.sets+(adj.s||0)+delta;if(ns<1||ns>10)return;adj.s=(adj.s||0)+delta;
+    if(delta<0){var newTot=effSets(ex,adj);for(var s=newTot;s<ex.sets+10;s++)delete setStates[setKey(ds,di,ei,s)];lset('sets',setStates);}}
+  if(field==='r'){if(!repsIsNumeric(ex.reps))return;var nr=(parseInt(ex.reps)||1)+(adj.r||0)+delta;if(nr<1||nr>30)return;adj.r=(adj.r||0)+delta;}
+  saveAdj(ds,di,ei,adj);
+  renderToday();
+}
+function resetAdj(di,ei){saveAdj(todayStr(),di,ei,{});renderToday();}
+
 function renderHeader(){
   var w=W();
   document.getElementById('H_SUB').textContent=(lang==='ko'?w.lk:w.le)+' · 12'+(lang==='ko'?'주 사이클':'-week cycle');
 }
-function cycleWeek(){curWeek=(curWeek+1)%12;lset('week',curWeek);renderHeader();renderToday();toast(lang==='ko'?W().lk:W().le);}
+function cycleWeek(d){curWeek=(curWeek+(d||1)+12)%12;lset('week',curWeek);renderHeader();renderToday();if(document.getElementById('screen-program').classList.contains('active'))renderProgram();toast(lang==='ko'?W().lk:W().le);}
 
 // ===== PRILEPIN VOLUME =====
 var PRILEPIN=[[0.50,0.54,15,20,25],[0.55,0.69,18,24,30],[0.70,0.79,12,18,24],[0.80,0.89,10,15,20],[0.90,1.00,4,7,10]];
 function getPrilepinZone(p){for(var i=0;i<PRILEPIN.length;i++){if(p>=PRILEPIN[i][0]&&p<=PRILEPIN[i][1])return PRILEPIN[i];}return null;}
 function calcDayVolume(){
-  var totalKg=0,snatchKg=0,cjKg=0,pReps=0,pMin=0,pMax=0;
-  W().days[curDay].ex.forEach(function(ex){
+  var ds=todayStr();
+  var totalKg=0,snatchKg=0,cjKg=0,pReps=0,pMin=0,pMax=0,pExtraReps=0;
+  W().days[curDay].ex.forEach(function(ex,ei){
     if(ex.acc||ex.ladder)return;
-    var w=calcW(ex,dayCondMult),reps=repsCount(ex.reps),vol=w*reps*ex.sets;
+    var adj=getAdj(ds,curDay,ei);
+    var w=effW(ex,adj),reps=repsCount(effReps(ex,adj)),sets=effSets(ex,adj),vol=w*reps*sets;
     totalKg+=vol;
     if(ex.base==='snatch')snatchKg+=vol;
     if(ex.base==='cleanjerk')cjKg+=vol;
     if((ex.base==='snatch'||ex.base==='cleanjerk')){
-      var z=getPrilepinZone(ex.pct*dayCondMult);
-      if(z){pReps+=reps*ex.sets;pMin+=z[2];pMax+=z[4];}
+      var z=getPrilepinZone(w/getPR(ex.base));
+      if(z){pReps+=reps*sets;pMin+=z[2];pMax+=z[4];}
     }
   });
-  return{totalKg:Math.round(totalKg),snatchKg:Math.round(snatchKg),cjKg:Math.round(cjKg),pReps:pReps,pMin:pMin,pMax:pMax};
+  // extras (warm-up + accessories): volume always; Prilepin only for snatch/C&J-family barbell lifts with a weight set
+  getExtras(ds).forEach(function(ex){
+    if(ex.weight==null||isNaN(ex.weight)||ex.weight<=0)return;
+    var vol=ex.weight*(ex.reps||1)*ex.sets;
+    totalKg+=vol;
+    if(ex.pril==='snatch')snatchKg+=vol;
+    if(ex.pril==='cleanjerk')cjKg+=vol;
+    if(ex.pril){
+      var z=getPrilepinZone(ex.weight/getPR(ex.pril));
+      if(z){pReps+=(ex.reps||1)*ex.sets;pExtraReps+=(ex.reps||1)*ex.sets;pMin+=z[2];pMax+=z[4];}
+    }
+  });
+  return{totalKg:Math.round(totalKg),snatchKg:Math.round(snatchKg),cjKg:Math.round(cjKg),pReps:pReps,pMin:pMin,pMax:pMax,pExtraReps:pExtraReps};
 }
 function renderVolumeBanner(){
   var v=calcDayVolume();var b=document.getElementById('VOL_BANNER');
@@ -767,13 +882,12 @@ function renderVolumeBanner(){
      '<span class="vol-label">Prilepin '+(lang==='ko'?'적정 범위':'range')+' ('+(hasZone?(v.pMin+'~'+v.pMax+' reps'):'—')+')</span>'+
      '<span class="vol-status" style="background:'+stBg+';color:'+stC+'">'+st+'</span></div>'+
     '<div class="vol-bar-track"><div class="vol-bar-fill" style="width:'+Math.min(pct,100)+'%;background:'+barC+';"></div></div>'+
-    '<div style="font-size:10px;color:var(--tx2);margin-top:3px;">'+(!hasZone?(lang==='ko'?'이 날은 Prilepin 기준 범위 밖 강도예요 (스피드/회복/기록 도전)':'Intensity outside Prilepin range (speed/recovery/PR day)'):(lang==='ko'?'주종목 '+v.pReps+'렙 / 기준 '+v.pMax+'렙':'Main lifts '+v.pReps+' / target '+v.pMax))+'</div></div>';
+    '<div style="font-size:10px;color:var(--tx2);margin-top:3px;">'+(!hasZone?(lang==='ko'?'이 날은 Prilepin 기준 범위 밖 강도예요 (스피드/회복/기록 도전)':'Intensity outside Prilepin range (speed/recovery/PR day)'):(lang==='ko'?'주종목 '+v.pReps+'렙 / 기준 '+v.pMax+'렙'+(v.pExtraReps>0?' (보조 +'+v.pExtraReps+'렙 포함)':''):'Main lifts '+v.pReps+' / target '+v.pMax+(v.pExtraReps>0?' (+'+v.pExtraReps+' from extras)':'')))+'</div></div>';
 }
 
 // ===== TODAY =====
 function renderToday(){
   var l=L(),w=W(),dd=w.days[curDay];
-  renderCondRow();
   document.getElementById('D_TITLE').textContent='Day '+(curDay+1);
   var dow=wDows[curDay];
   var todayIdx=detectTodayDayIdx();
@@ -811,20 +925,34 @@ function renderToday(){
     div.className='exc'+(ex.acc?' exc-acc':'')+(ex.ladder?' exc-lad':'');
     var noteHtml=exNote(ex)?'<div class="exd">'+exNote(ex)+'</div>':'';
     var tipHtml=ex.tip?'<button class="tipbtn" onclick="goTip(\''+ex.tip+'\')" title="tip"><i class="ti ti-info-circle"></i></button>':'';
-    var accBadge=ex.acc?'<span style="font-size:10px;background:rgba(186,117,23,.15);color:var(--o);border-radius:4px;padding:2px 6px;">'+l.accBadge+'</span>':'';
-    var chip,meta;
+    var adj=getAdj(ds,curDay,ei);
+    var adjusted=(adj.w||adj.s||adj.r);
+    var chipRow,ctrlRow='';
+    var nSets;
     if(ex.acc){
-      chip='<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span>';
-      meta=(lang==='ko'?ex.rk:ex.re);
+      chipRow='<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span><span class="epct">'+(lang==='ko'?ex.rk:ex.re)+'</span>';
+      nSets=ex.sets;
     }else if(ex.ladder){
-      chip='<span class="wchip">'+ladderStr(ex)+'</span>';
-      meta=l.ladderReps;
+      chipRow='<span class="wchip">'+ladderStr(ex)+'</span><span class="epct">'+l.ladderReps+'</span>';
+      nSets=ex.sets;
     }else{
-      chip='<span class="wchip">'+calcW(ex,dayCondMult)+' kg</span>';
-      meta=ex.sets+'×'+ex.reps+' · '+Math.round(ex.pct*100)+'%';
+      var wgt=effW(ex,adj),reps=effReps(ex,adj);nSets=effSets(ex,adj);
+      var wDeltaTag=adj.w?'<span style="font-size:10px;color:'+(adj.w>0?'var(--o)':'var(--b)')+';font-weight:700;">'+(adj.w>0?'+':'')+adj.w+'kg</span>':'';
+      var resetBtn=adjusted?'<button class="tipbtn" style="font-size:13px;color:var(--tx3);" onclick="resetAdj('+curDay+','+ei+')" title="reset">↺</button>':'';
+      chipRow='<button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'w\',-1)">−</button>'+
+        '<span class="wchip">'+wgt+' kg</span>'+
+        '<button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'w\',1)">+</button>'+
+        '<span class="epct">'+Math.round(ex.pct*100)+'%</span>'+wDeltaTag+resetBtn;
+      var repCtrl=repsIsNumeric(ex.reps)
+        ?'<button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'r\',-1)">−</button><b>'+reps+'</b><button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'r\',1)">+</button>'
+        :'<b>'+reps+'</b>';
+      ctrlRow='<div class="exm" style="gap:6px;font-size:12px;color:var(--tx2);">'+
+        '<span>'+l.setsLbl+'</span>'+
+        '<button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'s\',-1)">−</button><b>'+nSets+'</b><button class="abtn adjb-sm" onclick="bumpAdj('+curDay+','+ei+',\'s\',1)">+</button>'+
+        '<span style="margin-left:8px;">'+l.repsLbl+'</span>'+repCtrl+'</div>';
     }
     var srow=document.createElement('div');srow.className='srow';
-    for(var s=0;s<ex.sets;s++){
+    for(var s=0;s<nSets;s++){
       var k=setKey(ds,curDay,ei,s);
       var st=setStates[k]||'p';
       var btn=document.createElement('button');
@@ -835,12 +963,13 @@ function renderToday(){
       })(ds,curDay,ei,s,ex.rest);
       srow.appendChild(btn);
     }
-    div.innerHTML='<div class="exn">'+exName(ex)+' '+tipHtml+' '+accBadge+'</div>'+noteHtml+
-      '<div class="exm">'+chip+'<span class="epct">'+meta+'</span></div>';
+    div.innerHTML='<div class="exn">'+exName(ex)+' '+tipHtml+'</div>'+noteHtml+
+      '<div class="exm">'+chipRow+'</div>'+ctrlRow;
     div.appendChild(srow);
     list.appendChild(div);
   });
   renderVolumeBanner();
+  renderExtras();
 }
 function tapSet(ds,di,ei,si,rest){
   var k=setKey(ds,di,ei,si);
@@ -851,26 +980,165 @@ function tapSet(ds,di,ei,si,rest){
   if(document.getElementById('screen-cal').classList.contains('active'))renderCalDet(ds);
   if(setStates[k]==='d')openTimer(rest);
 }
-function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);dayCondMult=1.0;renderToday();}
+function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
+
+// ===== EXTRA EXERCISES (ad-hoc: warm-ups before main, accessories after) =====
+var pickerState={warm:false,acc:false};
+function renderExtras(){
+  ['warm','acc'].forEach(renderExtraCat);
+}
+function renderExtraCat(cat){
+  var l=L();
+  var ds=todayStr();
+  var extras=getExtras(ds).filter(function(x){return (x.cat||'acc')===cat;});
+  var list=document.getElementById(cat==='warm'?'WARM_LIST':'ACC_LIST');
+  if(!extras.length){list.innerHTML='<div style="font-size:12px;color:var(--tx2);padding:2px 0 6px;">'+l.extraNone+'</div>';return;}
+  list.innerHTML='';
+  extras.forEach(function(ex){
+    var name=lang==='ko'?ex.nameKo:ex.nameEn;
+    var note=lang==='ko'?ex.noteKo:ex.noteEn;
+    var prilTag=ex.pril?'<span style="font-size:9px;background:rgba(29,158,117,.15);color:var(--g);border-radius:4px;padding:2px 6px;font-weight:700;">Prilepin</span>':'';
+    var div=document.createElement('div');div.className='exc';div.style.marginBottom='10px';
+    var srow=document.createElement('div');srow.className='srow';
+    for(var s=0;s<ex.sets;s++){
+      var k=extraSetKey(ds,ex.uid,s);
+      var st=setStates[k]||'p';
+      var btn=document.createElement('button');
+      btn.className='sbtn'+(st==='d'?' done':st==='f'?' failed':'');
+      btn.textContent=s+1;
+      (function(uid,si){btn.addEventListener('click',function(){tapExtraSet(uid,si);});})(ex.uid,s);
+      srow.appendChild(btn);
+    }
+    div.innerHTML='<div class="exn">'+name+' '+prilTag+
+      '<button class="tipbtn" style="margin-left:auto;color:var(--r);" onclick="removeExtra(\''+ex.uid+'\')" title="delete"><i class="ti ti-trash"></i></button></div>'+
+      (note?'<div class="exd">'+note+'</div>':'')+
+      '<div class="exm" style="gap:6px;">'+
+      '<input class="pinp" style="width:70px;height:30px;padding:0 8px;flex:none;" type="number" step="0.5" value="'+(ex.weight!=null?ex.weight:'')+'" placeholder="'+l.extraWtPh+'" onchange="setExtraWeight(\''+ex.uid+'\',this.value)">'+
+      '<span class="epct">kg</span></div>'+
+      '<div class="exm" style="gap:6px;font-size:12px;color:var(--tx2);">'+
+      '<span>'+l.setsLbl+'</span>'+
+      '<button class="abtn adjb-sm" onclick="adjExtraField(\''+ex.uid+'\',\'sets\',-1)">−</button><b>'+ex.sets+'</b><button class="abtn adjb-sm" onclick="adjExtraField(\''+ex.uid+'\',\'sets\',1)">+</button>'+
+      '<span style="margin-left:8px;">'+l.repsLbl+'</span>'+
+      '<button class="abtn adjb-sm" onclick="adjExtraField(\''+ex.uid+'\',\'reps\',-1)">−</button><b>'+(ex.reps||1)+'</b><button class="abtn adjb-sm" onclick="adjExtraField(\''+ex.uid+'\',\'reps\',1)">+</button>'+
+      '</div>';
+    div.appendChild(srow);
+    list.appendChild(div);
+  });
+}
+function toggleExtraPicker(cat){
+  pickerState[cat]=!pickerState[cat];
+  document.getElementById('PICKER_'+cat).style.display=pickerState[cat]?'block':'none';
+  if(pickerState[cat])renderExtraChips(cat);
+}
+function renderExtraChips(cat){
+  document.getElementById('CHIPS_'+cat).innerHTML=EXTRA_LIB.filter(function(it){return it.cat===cat;}).map(function(it){
+    return '<button class="fbtn" onclick="addExtraFromLib(\''+it.id+'\')">'+(lang==='ko'?it.ko:it.en)+'</button>';
+  }).join('');
+}
+function addExtraFromLib(id){
+  var it=EXTRA_LIB.filter(function(x){return x.id===id;})[0];if(!it)return;
+  addExtraInstance(it.cat,it.ko,it.en,it.sets,it.reps,it.pril,it.nk,it.ne);
+}
+function addCustomExtra(cat){
+  var el=document.getElementById('CUSTOM_NAME_'+cat);
+  var name=(el.value||'').trim();
+  if(!name){toast(lang==='ko'?'운동 이름을 입력하세요':'Enter an exercise name');return;}
+  addExtraInstance(cat,name,name,3,8,null,'','');
+  el.value='';
+}
+function addExtraInstance(cat,nameKo,nameEn,sets,reps,pril,noteKo,noteEn){
+  var ds=todayStr();
+  var extras=getExtras(ds);
+  var uid='e'+Date.now()+Math.floor(Math.random()*1000);
+  extras.push({uid:uid,cat:cat,nameKo:nameKo,nameEn:nameEn,weight:null,sets:sets||3,reps:reps||8,pril:pril||null,noteKo:noteKo||'',noteEn:noteEn||''});
+  setExtras(ds,extras);
+  pickerState[cat]=false;document.getElementById('PICKER_'+cat).style.display='none';
+  renderExtras();renderVolumeBanner();
+  toast(lang==='ko'?'운동 추가됨':'Exercise added');
+}
+function removeExtra(uid){
+  var ds=todayStr();
+  var extras=getExtras(ds).filter(function(x){return x.uid!==uid;});
+  setExtras(ds,extras);
+  Object.keys(setStates).forEach(function(k){if(k.indexOf(ds+'-X'+uid+'-')===0)delete setStates[k];});
+  lset('sets',setStates);
+  renderExtras();renderVolumeBanner();
+}
+function setExtraWeight(uid,val){
+  var ds=todayStr();
+  var extras=getExtras(ds);
+  var w=parseFloat(val);
+  extras.forEach(function(x){if(x.uid===uid)x.weight=isNaN(w)?null:w;});
+  setExtras(ds,extras);
+  renderVolumeBanner();
+}
+function adjExtraField(uid,field,delta){
+  var ds=todayStr();
+  var extras=getExtras(ds);
+  extras.forEach(function(x){
+    if(x.uid!==uid)return;
+    if(field==='sets'){
+      var oldS=x.sets;
+      x.sets=Math.max(1,Math.min(8,x.sets+delta));
+      if(x.sets<oldS){for(var s=x.sets;s<oldS;s++){delete setStates[extraSetKey(ds,uid,s)];}lset('sets',setStates);}
+    }else{
+      x.reps=Math.max(1,Math.min(60,(x.reps||1)+delta));
+    }
+  });
+  setExtras(ds,extras);
+  renderExtras();renderVolumeBanner();
+}
+function tapExtraSet(uid,si){
+  var ds=todayStr();
+  var k=extraSetKey(ds,uid,si);
+  var c=setStates[k]||'p';
+  setStates[k]=c==='p'?'d':c==='d'?'f':'p';
+  lset('sets',setStates);
+  renderExtras();
+  if(document.getElementById('screen-cal').classList.contains('active'))renderCalDet(ds);
+  if(setStates[k]==='d')openTimer(90);
+}
 
 // ===== SAVE SESSION TO GRAPH =====
 function saveTodayToGraph(){
   var ds=todayStr(),dd=W().days[curDay],saved=0;
   dd.ex.forEach(function(ex,ei){
     if(!ex.log||ex.ladder)return;
-    var doneCnt=0;
-    for(var s=0;s<ex.sets;s++){if(setStates[setKey(ds,curDay,ei,s)]==='d')doneCnt++;}
+    var adj=getAdj(ds,curDay,ei);
+    var doneCnt=0,nSets=effSets(ex,adj);
+    for(var s=0;s<nSets;s++){if(setStates[setKey(ds,curDay,ei,s)]==='d')doneCnt++;}
     if(doneCnt===0)return;
-    var wgt=calcW(ex,dayCondMult);
+    var wgt=effW(ex,adj);
     var found=null;
     for(var i=0;i<logs.length;i++){if(logs[i].auto&&logs[i].ex===ex.log&&logs[i].date===ds){found=logs[i];break;}}
     if(found){found.weight=Math.max(found.weight,wgt);}
     else logs.push({ex:ex.log,weight:wgt,date:ds,auto:true});
     saved++;
   });
+  var extras=getExtras(ds);
+  extras.forEach(function(ex){
+    var doneCnt=0;
+    for(var s=0;s<ex.sets;s++){if(setStates[extraSetKey(ds,ex.uid,s)]==='d')doneCnt++;}
+    if(doneCnt===0)return;
+    if(ex.weight==null||isNaN(ex.weight)||ex.weight<=0)return;
+    var key=slugify(ex.nameKo);
+    var found=null;
+    for(var i=0;i<logs.length;i++){if(logs[i].auto&&logs[i].ex===key&&logs[i].date===ds){found=logs[i];break;}}
+    if(found){found.weight=Math.max(found.weight,ex.weight);found.labelKo=ex.nameKo;found.labelEn=ex.nameEn;}
+    else logs.push({ex:key,weight:ex.weight,date:ds,auto:true,labelKo:ex.nameKo,labelEn:ex.nameEn});
+    saved++;
+  });
   if(saved===0){toast(L().savedNone);return;}
   lset('logs',logs);
-  toast(saved+' '+L().savedDay);
+  // report prilepin status (incl. extras) with the save confirmation
+  var v=calcDayVolume();
+  var pMsg='';
+  if(v.pMax>0){
+    var st=v.pReps<v.pMin?(lang==='ko'?'부족':'Low'):v.pReps>v.pMax?(lang==='ko'?'과잉':'High'):(lang==='ko'?'적정':'OK');
+    pMsg=' · Prilepin '+v.pReps+'/'+v.pMin+'~'+v.pMax+' ('+st+(v.pExtraReps>0?(lang==='ko'?', 보조 +'+v.pExtraReps:', +'+v.pExtraReps+' extra'):'')+')';
+  }
+  toast(saved+' '+L().savedDay+pMsg);
+  renderVolumeBanner();
   if(document.getElementById('screen-graph').classList.contains('active'))renderGraph();
 }
 
@@ -944,7 +1212,7 @@ function renderCalDet(ds,diOvr){
   var dd=W().days[di];
   var dowN=l.dowNames[date.getDay()];
   var tot=0,done=0;
-  dd.ex.forEach(function(ex,ei){for(var s=0;s<ex.sets;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
+  dd.ex.forEach(function(ex,ei){var n=ex.ladder||ex.acc?ex.sets:effSets(ex,getAdj(ds,di,ei));for(var s=0;s<n;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
   det.style.display='block';
   det.innerHTML=
     '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — Day '+(di+1)+'</div>'+
@@ -955,9 +1223,11 @@ function renderCalDet(ds,diOvr){
     '</div><div style="font-size:11px;color:var(--tx3);margin-bottom:8px;">'+l.dotTip+'</div>';
   dd.ex.forEach(function(ex,ei){
     var d2=0;
+    var adj=ex.ladder||ex.acc?{}:getAdj(ds,di,ei);
+    var nSets=ex.ladder||ex.acc?ex.sets:effSets(ex,adj);
     var dots=document.createElement('div');
     dots.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:130px;';
-    for(var s=0;s<ex.sets;s++){
+    for(var s=0;s<nSets;s++){
       var st=setStates[setKey(ds,di,ei,s)]||'p';
       if(st==='d')d2++;
       var col=st==='d'?'#1D9E75':st==='f'?'#E24B4A':'var(--bd2)';
@@ -966,9 +1236,9 @@ function renderCalDet(ds,diOvr){
       (function(a,b,c,e,r){dot.addEventListener('click',function(){tapSet(a,b,c,e,r);});})(ds,di,ei,s,ex.rest);
       dots.appendChild(dot);
     }
-    var wdisp=ex.acc?(lang==='ko'?'맨몸':'BW'):ex.ladder?ladderStr(ex):calcW(ex)+'kg';
+    var wdisp=ex.acc?(lang==='ko'?'맨몸':'BW'):ex.ladder?ladderStr(ex):effW(ex,adj)+'kg';
     var row=document.createElement('div');row.className='cexr';
-    row.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+exName(ex)+'</div><div style="font-size:11px;color:var(--tx2);">'+wdisp+' · '+d2+'/'+ex.sets+'</div></div>';
+    row.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+exName(ex)+'</div><div style="font-size:11px;color:var(--tx2);">'+wdisp+' · '+d2+'/'+nSets+'</div></div>';
     row.appendChild(dots);
     det.appendChild(row);
   });
@@ -1120,6 +1390,11 @@ function renderPRSummary(){
   }).join('');
   el.innerHTML='<div class="card" style="padding:12px;"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:10px;"><i class="ti ti-trophy" style="color:var(--g)"></i> '+(lang==='ko'?'현재 PR 현황':'Current PR status')+'</div><div style="display:flex;gap:8px;">'+rows+'</div></div>';
 }
+function exLabel(x){
+  var l=L();
+  if(x.labelKo)return lang==='ko'?x.labelKo:(x.labelEn||x.labelKo);
+  return l.exNames[x.ex]||x.ex;
+}
 function renderGraph(){
   var l=L();
   renderPRSummary();
@@ -1130,7 +1405,7 @@ function renderGraph(){
     hist.innerHTML=filtered.slice().reverse().slice(0,40).map(function(x){
       var idx=logs.indexOf(x);
       var tag=x.auto?'<span class="htag">'+l.trainTag+'</span>':(x.weight>=getPR(x.ex)?'<span class="htag pr">'+l.prTag+'</span>':'');
-      return '<div class="hrow"><div><div class="hex">'+(l.exNames[x.ex]||x.ex)+' '+tag+'</div><div class="hdate">'+x.date+'</div></div>'+
+      return '<div class="hrow"><div><div class="hex">'+exLabel(x)+' '+tag+'</div><div class="hdate">'+x.date+'</div></div>'+
         '<div style="display:flex;align-items:center;gap:10px;"><span class="hwt">'+x.weight+'kg</span>'+
         '<button class="delbtn" onclick="delLog('+idx+')"><i class="ti ti-trash"></i></button></div></div>';
     }).join('');
@@ -1139,12 +1414,14 @@ function renderGraph(){
   if(chartInst){chartInst.destroy();chartInst=null;}
   var allDates=logs.map(function(x){return x.date;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
   if(!allDates.length)return;
-  var keys=curFilter==='all'?Object.keys(EX_COLORS):[curFilter];
+  var presentKeys=logs.map(function(x){return x.ex;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var keys=curFilter==='all'?presentKeys:[curFilter];
   var datasets=keys.map(function(k){
     var data=logs.filter(function(x){return x.ex===k;}).sort(function(a,b){return a.date>b.date?1:-1;});
     if(!data.length)return null;
-    return{label:l.exNames[k]||k,data:data.map(function(x){return{x:x.date,y:x.weight};}),
-      borderColor:EX_COLORS[k],backgroundColor:EX_COLORS[k],borderWidth:2,
+    var c=colorFor(k);
+    return{label:exLabel(data[data.length-1]),data:data.map(function(x){return{x:x.date,y:x.weight};}),
+      borderColor:c,backgroundColor:c,borderWidth:2,
       pointRadius:data.map(function(x){return x.auto?3:5;}),
       pointStyle:data.map(function(x){return x.auto?'circle':'rectRot';}),
       tension:0.3,fill:false};
@@ -1170,8 +1447,21 @@ function addLog(){
 function delLog(idx){if(idx<0||idx>=logs.length)return;logs.splice(idx,1);lset('logs',logs);renderGraph();}
 
 // ===== DATA =====
+function collectPrefixedForExport(prefix){
+  var out={};
+  try{
+    Object.keys(localStorage).forEach(function(k){
+      if(k.indexOf('wl2_'+prefix)===0){
+        var key=k.slice(('wl2_'+prefix).length);
+        try{out[key]=JSON.parse(localStorage.getItem(k));}catch(e){}
+      }
+    });
+  }catch(e){}
+  return out;
+}
+function collectExtrasForExport(){return collectPrefixedForExport('extra_');}
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,extras:collectExtrasForExport(),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -1188,6 +1478,8 @@ function importData(e){
       if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
       if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
       lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);
+      if(d.extras){Object.keys(d.extras).forEach(function(dateKey){setExtras(dateKey,d.extras[dateKey]);});}
+      if(d.madj){Object.keys(d.madj).forEach(function(dateKey){lset('madj_'+dateKey,d.madj[dateKey]);});}
       applyLang();renderHeader();renderToday();renderPRInputs();
       toast(L().imported);
     }catch(err){toast(L().importErr);}
