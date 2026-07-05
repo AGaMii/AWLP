@@ -96,6 +96,8 @@ body{display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
 .hdate{font-size:11px;color:var(--tx2);margin-top:2px;}
 .hwt{font-size:16px;font-weight:700;color:var(--g);}
 .delbtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:18px;padding:4px 8px;}
+.exdel{flex:none;background:rgba(226,75,74,.12);border:.5px solid rgba(226,75,74,.4);color:var(--r);cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;white-space:nowrap;}
+.exdel:active{background:rgba(226,75,74,.25);}
 .istep{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:.5px solid var(--bd);}
 .istep:last-child{border-bottom:none;}
 .inum{width:24px;height:24px;border-radius:50%;background:var(--g);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -140,7 +142,7 @@ select.pinp{appearance:none;}
 .tipdesc b{color:var(--g);}
 .tiphl{outline:2px solid var(--g);outline-offset:2px;border-radius:8px;}
 .cuebadge{display:inline-block;font-size:10px;font-weight:700;background:var(--gl);color:var(--gd);border-radius:4px;padding:2px 7px;}
-.adjb-sm{width:26px!important;height:26px!important;font-size:15px!important;padding:0!important;flex-shrink:0;}
+.adjb-sm{width:28px!important;height:28px!important;font-size:15px!important;padding:0!important;flex-shrink:0;border:.5px solid var(--bd2)!important;background:var(--sf)!important;color:var(--tx)!important;}
 .exm b{color:var(--tx);font-size:13px;}
 @media(prefers-color-scheme:dark){.cuebadge{background:#0F6E56;color:#9FE1CB;}}
 </style>
@@ -648,7 +650,7 @@ var LNG={
   exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스',ohs:'오버헤드 스쿼트',eccdl:'익센트릭 DL',powersn:'파워 스내치',powercj:'파워 클린(+저크)'},
   logOpts:[{v:'snatch',l:'스내치'},{v:'cleanjerk',l:'클린&저크'},{v:'squat',l:'백 스쿼트'},{v:'frontsquat',l:'프론트 스쿼트'},{v:'press',l:'푸시 프레스'}],
   gFilters:[{k:'all',l:'전체'},{k:'snatch',l:'스내치'},{k:'cleanjerk',l:'클린&저크'},{k:'squat',l:'백스쿼트'},{k:'frontsquat',l:'프론트'},{k:'press',l:'푸시프레스'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'익센트릭DL'},{k:'powersn',l:'파워스내치'},{k:'powercj',l:'파워클린'}],
-  extraTitle:'추가 운동',addExtraBtn:'+ 운동 추가',customPh:'운동 이름 직접 입력',addBtn:'추가',extraWtPh:'중량',setsLbl:'세트',repsLbl:'횟수',extraNone:'추가된 운동이 없어요',customTitle:'직접 입력',closePicker:'닫기',
+  extraTitle:'추가 운동',addExtraBtn:'+ 운동 추가',customPh:'운동 이름 직접 입력',addBtn:'추가',extraWtPh:'중량',setsLbl:'세트',repsLbl:'횟수',extraNone:'추가된 운동이 없어요',customTitle:'직접 입력',closePicker:'닫기',delBtn:'삭제',
   warmTitle:'웜업 운동',accTitle:'보조·마무리 운동',warmLibTitle:'추천 웜업',accLibTitle:'추천 보조·마무리',
   prevWeek:'이전 주',adjReset:'원래대로',prilFrom:'보조 포함',prilSaveMsg:'Prilepin',
   condL:'가볍게 -10%',condN:'보통',condH:'무겁게 +5%',
@@ -679,7 +681,7 @@ var LNG={
   exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press',ohs:'Overhead Squat',eccdl:'Eccentric DL',powersn:'Power Snatch',powercj:'Power Clean(+Jerk)'},
   logOpts:[{v:'snatch',l:'Snatch'},{v:'cleanjerk',l:'Clean & Jerk'},{v:'squat',l:'Back Squat'},{v:'frontsquat',l:'Front Squat'},{v:'press',l:'Push Press'}],
   gFilters:[{k:'all',l:'All'},{k:'snatch',l:'Snatch'},{k:'cleanjerk',l:'C&J'},{k:'squat',l:'Back Sq'},{k:'frontsquat',l:'Front Sq'},{k:'press',l:'Press'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'Ecc DL'},{k:'powersn',l:'Pwr Snatch'},{k:'powercj',l:'Pwr Clean'}],
-  extraTitle:'Extra Exercises',addExtraBtn:'+ Add Exercise',customPh:'Type exercise name',addBtn:'Add',extraWtPh:'Weight',setsLbl:'sets',repsLbl:'reps',extraNone:'No exercises added',customTitle:'Custom',closePicker:'Close',
+  extraTitle:'Extra Exercises',addExtraBtn:'+ Add Exercise',customPh:'Type exercise name',addBtn:'Add',extraWtPh:'Weight',setsLbl:'sets',repsLbl:'reps',extraNone:'No exercises added',customTitle:'Custom',closePicker:'Close',delBtn:'Delete',
   warmTitle:'Warm-up',accTitle:'Accessories / Finishers',warmLibTitle:'Suggested warm-ups',accLibTitle:'Suggested accessories',
   prevWeek:'Prev Week',adjReset:'Reset',prilFrom:'incl. extras',prilSaveMsg:'Prilepin',
   condL:'Light -10%',condN:'Normal',condH:'Heavy +5%',
@@ -1010,8 +1012,9 @@ function renderExtraCat(cat){
       (function(uid,si){btn.addEventListener('click',function(){tapExtraSet(uid,si);});})(ex.uid,s);
       srow.appendChild(btn);
     }
-    div.innerHTML='<div class="exn">'+name+' '+prilTag+
-      '<button class="delbtn" style="margin-left:auto;" onclick="removeExtra(\''+ex.uid+'\')" title="delete"><i class="ti ti-trash"></i></button></div>'+
+    div.innerHTML='<div class="exn" style="flex-wrap:nowrap;">'+
+      '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">'+name+'</span> '+prilTag+
+      '<button class="exdel" onclick="removeExtra(\''+ex.uid+'\')" title="delete">'+l.delBtn+'</button></div>'+
       (note?'<div class="exd">'+note+'</div>':'')+
       '<div class="exm" style="gap:6px;">'+
       '<input class="pinp" style="width:70px;height:30px;padding:0 8px;flex:none;" type="number" step="0.5" value="'+(ex.weight!=null?ex.weight:'')+'" placeholder="'+l.extraWtPh+'" onchange="setExtraWeight(\''+ex.uid+'\',this.value)">'+
