@@ -725,9 +725,10 @@ function setKey(ds,di,ei,si){return ds+'-'+di+'-'+ei+'-'+si;}
 function dateWorkoutDay(date){var d=date.getDay();var i=wDows.indexOf(d);return i===-1?null:i;}
 function hasLog(ds){return Object.keys(setStates).some(function(k){return k.indexOf(ds)===0&&(setStates[k]==='d'||setStates[k]==='f');});}
 function isPRWeek(){return curWeek===10;}
-function getExtras(ds){return lget('extra_'+ds,[]);}
-function setExtras(ds,arr){lset('extra_'+ds,arr);}
-function extraSetKey(ds,uid,si){return ds+'-X'+uid+'-'+si;}
+function extraScope(){return todayStr()+'-D'+curDay;}
+function getExtras(scope){return lget('extra_'+scope,[]);}
+function setExtras(scope,arr){lset('extra_'+scope,arr);}
+function extraSetKey(scope,uid,si){return scope+'-X'+uid+'-'+si;}
 function slugify(s){return 'c_'+s.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30)||'c_ex';}
 
 // ===== APPLY LANGUAGE =====
@@ -851,7 +852,7 @@ function calcDayVolume(){
     }
   });
   // extras (warm-up + accessories): volume always; Prilepin only for snatch/C&J-family barbell lifts with a weight set
-  getExtras(ds).forEach(function(ex){
+  getExtras(extraScope()).forEach(function(ex){
     if(ex.weight==null||isNaN(ex.weight)||ex.weight<=0)return;
     var vol=ex.weight*(ex.reps||1)*ex.sets;
     totalKg+=vol;
@@ -989,8 +990,8 @@ function renderExtras(){
 }
 function renderExtraCat(cat){
   var l=L();
-  var ds=todayStr();
-  var extras=getExtras(ds).filter(function(x){return (x.cat||'acc')===cat;});
+  var scope=extraScope();
+  var extras=getExtras(scope).filter(function(x){return (x.cat||'acc')===cat;});
   var list=document.getElementById(cat==='warm'?'WARM_LIST':'ACC_LIST');
   if(!extras.length){list.innerHTML='<div style="font-size:12px;color:var(--tx2);padding:2px 0 6px;">'+l.extraNone+'</div>';return;}
   list.innerHTML='';
@@ -1001,7 +1002,7 @@ function renderExtraCat(cat){
     var div=document.createElement('div');div.className='exc';div.style.marginBottom='10px';
     var srow=document.createElement('div');srow.className='srow';
     for(var s=0;s<ex.sets;s++){
-      var k=extraSetKey(ds,ex.uid,s);
+      var k=extraSetKey(scope,ex.uid,s);
       var st=setStates[k]||'p';
       var btn=document.createElement('button');
       btn.className='sbtn'+(st==='d'?' done':st==='f'?' failed':'');
@@ -1010,7 +1011,7 @@ function renderExtraCat(cat){
       srow.appendChild(btn);
     }
     div.innerHTML='<div class="exn">'+name+' '+prilTag+
-      '<button class="tipbtn" style="margin-left:auto;color:var(--r);" onclick="removeExtra(\''+ex.uid+'\')" title="delete"><i class="ti ti-trash"></i></button></div>'+
+      '<button class="delbtn" style="margin-left:auto;" onclick="removeExtra(\''+ex.uid+'\')" title="delete"><i class="ti ti-trash"></i></button></div>'+
       (note?'<div class="exd">'+note+'</div>':'')+
       '<div class="exm" style="gap:6px;">'+
       '<input class="pinp" style="width:70px;height:30px;padding:0 8px;flex:none;" type="number" step="0.5" value="'+(ex.weight!=null?ex.weight:'')+'" placeholder="'+l.extraWtPh+'" onchange="setExtraWeight(\''+ex.uid+'\',this.value)">'+
@@ -1047,55 +1048,55 @@ function addCustomExtra(cat){
   el.value='';
 }
 function addExtraInstance(cat,nameKo,nameEn,sets,reps,pril,noteKo,noteEn){
-  var ds=todayStr();
-  var extras=getExtras(ds);
+  var scope=extraScope();
+  var extras=getExtras(scope);
   var uid='e'+Date.now()+Math.floor(Math.random()*1000);
   extras.push({uid:uid,cat:cat,nameKo:nameKo,nameEn:nameEn,weight:null,sets:sets||3,reps:reps||8,pril:pril||null,noteKo:noteKo||'',noteEn:noteEn||''});
-  setExtras(ds,extras);
+  setExtras(scope,extras);
   pickerState[cat]=false;document.getElementById('PICKER_'+cat).style.display='none';
   renderExtras();renderVolumeBanner();
   toast(lang==='ko'?'운동 추가됨':'Exercise added');
 }
 function removeExtra(uid){
-  var ds=todayStr();
-  var extras=getExtras(ds).filter(function(x){return x.uid!==uid;});
-  setExtras(ds,extras);
-  Object.keys(setStates).forEach(function(k){if(k.indexOf(ds+'-X'+uid+'-')===0)delete setStates[k];});
+  var scope=extraScope();
+  var extras=getExtras(scope).filter(function(x){return x.uid!==uid;});
+  setExtras(scope,extras);
+  Object.keys(setStates).forEach(function(k){if(k.indexOf(scope+'-X'+uid+'-')===0)delete setStates[k];});
   lset('sets',setStates);
   renderExtras();renderVolumeBanner();
+  toast(lang==='ko'?'삭제됨':'Deleted');
 }
 function setExtraWeight(uid,val){
-  var ds=todayStr();
-  var extras=getExtras(ds);
+  var scope=extraScope();
+  var extras=getExtras(scope);
   var w=parseFloat(val);
   extras.forEach(function(x){if(x.uid===uid)x.weight=isNaN(w)?null:w;});
-  setExtras(ds,extras);
+  setExtras(scope,extras);
   renderVolumeBanner();
 }
 function adjExtraField(uid,field,delta){
-  var ds=todayStr();
-  var extras=getExtras(ds);
+  var scope=extraScope();
+  var extras=getExtras(scope);
   extras.forEach(function(x){
     if(x.uid!==uid)return;
     if(field==='sets'){
       var oldS=x.sets;
       x.sets=Math.max(1,Math.min(8,x.sets+delta));
-      if(x.sets<oldS){for(var s=x.sets;s<oldS;s++){delete setStates[extraSetKey(ds,uid,s)];}lset('sets',setStates);}
+      if(x.sets<oldS){for(var s=x.sets;s<oldS;s++){delete setStates[extraSetKey(scope,uid,s)];}lset('sets',setStates);}
     }else{
       x.reps=Math.max(1,Math.min(60,(x.reps||1)+delta));
     }
   });
-  setExtras(ds,extras);
+  setExtras(scope,extras);
   renderExtras();renderVolumeBanner();
 }
 function tapExtraSet(uid,si){
-  var ds=todayStr();
-  var k=extraSetKey(ds,uid,si);
+  var scope=extraScope();
+  var k=extraSetKey(scope,uid,si);
   var c=setStates[k]||'p';
   setStates[k]=c==='p'?'d':c==='d'?'f':'p';
   lset('sets',setStates);
   renderExtras();
-  if(document.getElementById('screen-cal').classList.contains('active'))renderCalDet(ds);
   if(setStates[k]==='d')openTimer(90);
 }
 
@@ -1115,10 +1116,10 @@ function saveTodayToGraph(){
     else logs.push({ex:ex.log,weight:wgt,date:ds,auto:true});
     saved++;
   });
-  var extras=getExtras(ds);
+  var extras=getExtras(extraScope());
   extras.forEach(function(ex){
     var doneCnt=0;
-    for(var s=0;s<ex.sets;s++){if(setStates[extraSetKey(ds,ex.uid,s)]==='d')doneCnt++;}
+    for(var s=0;s<ex.sets;s++){if(setStates[extraSetKey(extraScope(),ex.uid,s)]==='d')doneCnt++;}
     if(doneCnt===0)return;
     if(ex.weight==null||isNaN(ex.weight)||ex.weight<=0)return;
     var key=slugify(ex.nameKo);
@@ -1505,6 +1506,33 @@ function sw(name){
 }
 
 // ===== INIT =====
+// one-time migration: legacy extras were keyed by date only (extra_YYYY-MM-DD),
+// which made them appear on every training day. Move each into that date's Day 1 scope.
+(function migrateExtras(){
+  if(lget('extraMig1',false))return;
+  try{
+    Object.keys(localStorage).slice().forEach(function(k){
+      var m=k.match(/^wl2_extra_(\d{4}-\d{2}-\d{2})$/); // date-only, no -D suffix
+      if(!m)return;
+      var dateKey=m[1];
+      var val=lget('extra_'+dateKey,null);
+      if(val&&val.length){
+        var target='extra_'+dateKey+'-D0';
+        var existing=lget(target,[]);
+        lset(target,existing.concat(val));
+        // migrate their set-states too
+        var sets=lget('sets',{}),changed=false;
+        Object.keys(sets).forEach(function(sk){
+          var pfx=dateKey+'-X';
+          if(sk.indexOf(pfx)===0){sets[dateKey+'-D0-X'+sk.slice(pfx.length)]=sets[sk];delete sets[sk];changed=true;}
+        });
+        if(changed){setStates=sets;lset('sets',sets);}
+      }
+      try{localStorage.removeItem(k);}catch(e){}
+    });
+  }catch(e){}
+  lset('extraMig1',true);
+})();
 applyLang();
 renderHeader();
 renderToday();
