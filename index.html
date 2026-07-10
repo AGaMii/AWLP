@@ -151,6 +151,7 @@ select.pinp{appearance:none;}
     <div class="hdr-sub" id="H_SUB"></div>
   </div>
   <div style="display:flex;gap:6px;">
+    <button class="hdr-btn" id="H_TODAY" onclick="goToday()" style="background:#fff;color:var(--g);font-weight:700;"></button>
     <button class="hdr-btn" id="H_PREV" onclick="cycleWeek(-1)">이전 주</button>
     <button class="hdr-btn" id="H_NEXT" onclick="cycleWeek(1)">다음 주</button>
   </div>
@@ -312,8 +313,7 @@ select.pinp{appearance:none;}
       </div>
       <div class="prow"><span class="plbl" id="BODY_BW_L"></span><input class="pinp" id="BODY_BW" type="number" step="0.5" min="30" oninput="onBodyInput()"><span class="punit">kg</span></div>
       <div class="prow"><span class="plbl" id="BODY_HT_L"></span><input class="pinp" id="BODY_HT" type="number" step="0.5" min="120" oninput="onBodyInput()"><span class="punit">cm</span></div>
-      <div style="font-size:11px;color:var(--tx2);margin-bottom:8px;" id="BODY_PROMPT"></div>
-      <div class="dbox" id="LEVEL_BOX" style="display:none;">
+      <div class="dbox" id="LEVEL_BOX">
         <div class="dbtitle" id="LEVEL_TITLE"></div>
         <div id="LEVEL_ROWS"></div>
         <button class="ghostb" id="BTN_APPLY_TIER" style="margin-top:8px;display:none;" onclick="applyRecommendedTier()"></button>
@@ -641,7 +641,7 @@ var TIPS=[
 
 // ===== TRANSLATIONS =====
 var LNG={
- ko:{appTitle:'역도 트레이너',nextWeek:'다음 주',
+ ko:{appTitle:'역도 트레이너',nextWeek:'다음 주',todayBtn:'오늘',
   nToday:'오늘',nCal:'캘린더',nGraph:'그래프',nTips:'운동팁',nProg:'프로그램',nSet:'설정',
   sLang:'언어 설정',sPR:'나의 PR (1RM) 입력',btnSavePR:'저장하기',
   sOpt:'중량 계산 옵션',sRoundLbl:'반올림 단위',
@@ -679,7 +679,7 @@ var LNG={
   warmTitle:'웜업 운동',accTitle:'보조·마무리 운동',warmLibTitle:'추천 웜업',accLibTitle:'추천 보조·마무리',
   prevWeek:'이전 주',
   ladderReps:'1회씩 3시도',accBadge:'보조'},
- en:{appTitle:'WL Trainer',nextWeek:'Next Week',
+ en:{appTitle:'WL Trainer',nextWeek:'Next Week',todayBtn:'Today',
   nToday:'Today',nCal:'Calendar',nGraph:'Graph',nTips:'Tips',nProg:'Program',nSet:'Settings',
   sLang:'Language',sPR:'My PR (1RM)',btnSavePR:'Save',
   sOpt:'Weight calculation',sRoundLbl:'Rounding unit',
@@ -724,6 +724,9 @@ function lset(k,v){try{localStorage.setItem('wl2_'+k,JSON.stringify(v));}catch(e
 
 var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
 var curWeek=Math.min(lget('week',0),11);
+// anchorWeek is the actually-saved program week; curWeek can diverge from it while browsing
+// via the prev/next-week buttons without overwriting saved progress. goToday() snaps back.
+var anchorWeek=curWeek;
 var wDows=lget('dows',[1,2,4,5]);
 var lang=lget('lang','ko');
 var roundUnit=lget('roundUnit',2.5);
@@ -780,6 +783,7 @@ function applyLang(){
   document.getElementById('H_TITLE').innerHTML='<i class="ti ti-barbell"></i> '+l.appTitle;
   document.getElementById('H_NEXT').textContent=l.nextWeek;
   document.getElementById('H_PREV').textContent=l.prevWeek;
+  document.getElementById('H_TODAY').textContent=l.todayBtn;
   ['N_TODAY','N_CAL','N_GRAPH','N_TIPS','N_PROG','N_SET'].forEach(function(id,i){
     document.getElementById(id).textContent=[l.nToday,l.nCal,l.nGraph,l.nTips,l.nProg,l.nSet][i];
   });
@@ -920,13 +924,17 @@ function classifyLevel(){
 }
 function renderLevelBox(){
   var l=L();
-  var box=document.getElementById('LEVEL_BOX'),prompt=document.getElementById('BODY_PROMPT');
+  var box=document.getElementById('LEVEL_BOX');
   if(!box)return;
-  var c=classifyLevel();
-  if(!c){box.style.display='none';if(prompt){prompt.textContent=l.bwPrompt;prompt.style.display='block';}return;}
-  if(prompt)prompt.style.display='none';
   box.style.display='block';
   document.getElementById('LEVEL_TITLE').textContent=l.levelTitle;
+  var c=classifyLevel();
+  var btn=document.getElementById('BTN_APPLY_TIER');
+  if(!c){
+    document.getElementById('LEVEL_ROWS').innerHTML='<div style="font-size:12px;color:var(--tx2);padding:2px 0;">'+l.bwPrompt+'</div>';
+    btn.style.display='none';
+    return;
+  }
   var html='';
   html+='<div class="drow"><span>'+l.lvlLabel+'</span><span><b style="color:var(--g)">'+l.lvlNames[c.levelKey]+'</b></span></div>';
   if(c.sinclair)html+='<div class="drow"><span>'+l.sinclairLabel+'</span><span><b>'+c.sinclair+'</b></span></div>';
@@ -935,7 +943,6 @@ function renderLevelBox(){
   if(c.bmi)html+='<div class="drow"><span>'+l.bmiLabel+'</span><span><b>'+c.bmi+'</b></span></div>';
   html+='<div class="drow"><span>'+l.recTier+'</span><span><b style="color:var(--o)">'+l.volTierNames[c.tier]+'</b></span></div>';
   document.getElementById('LEVEL_ROWS').innerHTML=html;
-  var btn=document.getElementById('BTN_APPLY_TIER');
   if(c.tier===volTier){btn.style.display='none';}
   else{btn.style.display='block';btn.textContent=l.applyTier+' → '+l.volTierNames[c.tier];}
 }
@@ -966,7 +973,15 @@ function renderHeader(){
   var w=W();
   document.getElementById('H_SUB').textContent=(lang==='ko'?w.lk:w.le)+' · 12'+(lang==='ko'?'주 사이클':'-week cycle');
 }
-function cycleWeek(d){curWeek=(curWeek+(d||1)+12)%12;lset('week',curWeek);renderHeader();renderToday();if(document.getElementById('screen-program').classList.contains('active'))renderProgram();toast(lang==='ko'?W().lk:W().le);}
+function cycleWeek(d){curWeek=(curWeek+(d||1)+12)%12;renderHeader();renderToday();if(document.getElementById('screen-program').classList.contains('active'))renderProgram();toast(lang==='ko'?W().lk:W().le);}
+function goToday(){
+  curWeek=anchorWeek;
+  var a=detectTodayDayIdx();
+  if(a!==null){curDay=a;lset('day',curDay);}
+  renderHeader();
+  sw('today');
+  toast(lang==='ko'?'오늘로 이동':'Jumped to today');
+}
 
 // ===== PRILEPIN VOLUME =====
 // zones: [pctLow, pctHigh, minReps, optimalReps, maxReps] — contiguous, half-open [low,high)
@@ -1480,7 +1495,7 @@ function renderProgram(){
     list.appendChild(d);
   });
 }
-function selWeek(i){curWeek=i;lset('week',i);renderProgram();renderToday();renderHeader();}
+function selWeek(i){curWeek=i;anchorWeek=i;lset('week',i);renderProgram();renderToday();renderHeader();}
 
 // ===== TIPS =====
 function renderTips(){
@@ -1613,7 +1628,7 @@ function importData(e){
     try{
       var d=JSON.parse(ev.target.result);
       if(d.prs)prs=d.prs;if(d.logs)logs=d.logs;
-      if(d.curWeek!=null)curWeek=Math.min(d.curWeek,11);
+      if(d.curWeek!=null){curWeek=Math.min(d.curWeek,11);anchorWeek=curWeek;}
       if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
       if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
       if(d.volTier&&VOL_TIER_MULT[d.volTier])volTier=d.volTier;
