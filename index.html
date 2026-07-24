@@ -342,7 +342,8 @@ select.pinp{appearance:none;}
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="AUTO_HINT"></div>
       <div class="ltog" id="AUTO_ROW"></div>
       <div class="dbox" id="AUTO_BOX" style="margin-top:10px;"></div>
-      <button class="ghostb" id="BTN_START_TODAY" onclick="startCycleToday()" style="margin-top:0;"></button>
+      <button class="ghostb" id="BTN_POSTPONE_SET" onclick="postponeWeek()" style="margin-top:0;"></button>
+      <button class="ghostb" id="BTN_START_TODAY" onclick="startCycleToday()"></button>
     </div>
     <div class="card">
       <div class="ct"><i class="ti ti-calendar-week"></i> <span id="S_DOW"></span></div>
@@ -665,7 +666,7 @@ var LNG={
   dwkAssumed:'미기록',
   prWeekEta:'🏆 11주차(기록 도전) 예상 기간: {a} ~ {b}',
   sAuto:'자동 주차 진행',
-  autoHint:'사이클 시작일 기준으로 새 주가 되면 다음 주차를 제안해요. 자동으로 넘어가지는 않고, 확인 후 진행하거나 못 하신 주는 미룰 수 있어요.',
+  autoHint:'사이클 시작일 기준으로 새 주가 되면 오늘 탭에 다음 주차를 제안해요. 자동으로 넘어가지 않으며, 못 가는 주는 아래 [한 주 미루기]로 미리 밀어둘 수 있어요 (PR 도전 예상일도 함께 조정됨).',
   autoNames:{on:'자동 제안',off:'수동'},
   autoStartL:'사이클 시작일 (1주차)',autoNowL:'날짜 기준',autoSavedL:'현재 진행 주차',
   cycleStartNone:'미설정',btnStartToday:'이번 주를 1주차로 시작하기',
@@ -674,6 +675,8 @@ var LNG={
   autoNewWeek:'📅 새로운 주가 시작됐어요',
   autoNewWeekSub:'날짜 기준으로는 {w}입니다. 진행할까요? 지난주에 운동을 못 하셨다면 미루고 한 주 더 유지할 수 있어요.',
   btnAdvance:'{w}로 진행',btnPostpone:'한 주 미루기',
+  btnPostponeLong:'⏸ 이번 주 못 가요 — 한 주 미루기',
+  needCycleStart:'먼저 사이클 시작일을 설정해주세요',
   postponed:'한 주 미뤘어요',advanced:'주차 이동',
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
   dowNames:['일','월','화','수','목','금','토'],
@@ -725,6 +728,8 @@ var LNG={
   autoNewWeek:'📅 A new week has started',
   autoNewWeekSub:'By the calendar you are in {w}. Move on? If you missed last week, postpone and stay another week.',
   btnAdvance:'Go to {w}',btnPostpone:'Postpone a week',
+  btnPostponeLong:'\u23f8 Missing this week - postpone by one',
+  needCycleStart:'Set a cycle start date first',
   postponed:'Postponed by one week',advanced:'Week changed',
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
   dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
@@ -849,6 +854,7 @@ function applyLang(){
   document.getElementById('S_AUTO').textContent=l.sAuto;
   document.getElementById('AUTO_HINT').textContent=l.autoHint;
   document.getElementById('BTN_START_TODAY').textContent=l.btnStartToday;
+  document.getElementById('BTN_POSTPONE_SET').textContent=l.btnPostponeLong;
   renderAutoRow();renderAutoBox();
   document.getElementById('S_DOW').textContent=l.sDow;
   document.getElementById('BTN_SAVE_DOW').textContent=l.btnSaveDow;
@@ -959,6 +965,8 @@ function renderAutoBox(){
   var l=L();
   var box=document.getElementById('AUTO_BOX');
   if(!box)return;
+  var pb=document.getElementById('BTN_POSTPONE_SET');
+  if(pb)pb.style.display=autoWeek?'block':'none';
   if(!autoWeek){
     box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.autoOffMsg+'</div>';
     return;
@@ -1089,11 +1097,14 @@ function advanceToComputed(){
   toast(L().advanced+' — '+(lang==='ko'?W().lk:W().le));
 }
 function postponeWeek(){
-  var cw=computedWeek();if(cw===null)return;
-  var diff=cw-curWeek;if(diff<=0)return;
+  if(!cycleStart){toast(L().needCycleStart);return;}
+  var cw=computedWeek();
+  // banner case: catch up to the calendar. proactive case: push everything back one week.
+  var diff=(cw!=null&&cw>curWeek)?(cw-curWeek):1;
   cycleStart=shiftDateStr(cycleStart,diff*7);lset('cycleStart',cycleStart);
   renderToday();
   if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
+  if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
   toast(L().postponed);
 }
 function renderAutoWeekBanner(){
