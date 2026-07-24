@@ -677,6 +677,8 @@ var LNG={
   btnAdvance:'{w}로 진행',btnPostpone:'한 주 미루기',
   btnPostponeLong:'⏸ 이번 주 못 가요 — 한 주 미루기',
   needCycleStart:'먼저 사이클 시작일을 설정해주세요',
+  postponeWait:'⏳ 미루기 완료 — {n}일 후 다시 가능',
+  postponeBlocked:'이미 이번 주를 미뤘어요. {n}일 후에 다시 미룰 수 있어요.',
   postponed:'한 주 미뤘어요',advanced:'주차 이동',
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
   dowNames:['일','월','화','수','목','금','토'],
@@ -730,6 +732,8 @@ var LNG={
   btnAdvance:'Go to {w}',btnPostpone:'Postpone a week',
   btnPostponeLong:'\u23f8 Missing this week - postpone by one',
   needCycleStart:'Set a cycle start date first',
+  postponeWait:'\u23f3 Postponed - available again in {n}d',
+  postponeBlocked:'Already postponed this week. Available again in {n} day(s).',
   postponed:'Postponed by one week',advanced:'Week changed',
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
   dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
@@ -772,6 +776,9 @@ var curWeek=Math.min(lget('week',0),11);
 // Training progress follows what you actually did, not the calendar, so nothing advances silently.
 var autoWeek=lget('autoWeek',false);
 var cycleStart=lget('cycleStart',null);
+// one postpone per real week: after postponing, the next one unlocks 7 days later,
+// so repeated taps can't silently push the cycle out by months.
+var lastPostpone=lget('lastPostpone',null);
 var wDows=lget('dows',[1,2,4,5]);
 var lang=lget('lang','ko');
 var roundUnit=lget('roundUnit',2.5);
@@ -966,7 +973,13 @@ function renderAutoBox(){
   var box=document.getElementById('AUTO_BOX');
   if(!box)return;
   var pb=document.getElementById('BTN_POSTPONE_SET');
-  if(pb)pb.style.display=autoWeek?'block':'none';
+  if(pb){
+    pb.style.display=autoWeek?'block':'none';
+    var pl=postponeDaysLeft();
+    pb.textContent=pl>0?l.postponeWait.replace('{n}',pl):l.btnPostponeLong;
+    pb.disabled=pl>0;
+    pb.style.opacity=pl>0?'.5':'1';
+  }
   if(!autoWeek){
     box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.autoOffMsg+'</div>';
     return;
@@ -1096,12 +1109,17 @@ function advanceToComputed(){
   setWeek(cw,false);
   toast(L().advanced+' — '+(lang==='ko'?W().lk:W().le));
 }
+function postponeDaysLeft(){
+  if(!lastPostpone)return 0;
+  var d=Math.floor((parseDate(todayStr())-parseDate(lastPostpone))/86400000);
+  return Math.max(0,Math.min(7,7-d));
+}
 function postponeWeek(){
   if(!cycleStart){toast(L().needCycleStart);return;}
-  var cw=computedWeek();
-  // banner case: catch up to the calendar. proactive case: push everything back one week.
-  var diff=(cw!=null&&cw>curWeek)?(cw-curWeek):1;
-  cycleStart=shiftDateStr(cycleStart,diff*7);lset('cycleStart',cycleStart);
+  var left=postponeDaysLeft();
+  if(left>0){toast(L().postponeBlocked.replace('{n}',left));return;}
+  cycleStart=shiftDateStr(cycleStart,7);lset('cycleStart',cycleStart);
+  lastPostpone=todayStr();lset('lastPostpone',lastPostpone);
   renderToday();
   if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
   if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
@@ -1114,12 +1132,13 @@ function renderAutoWeekBanner(){
   var cw=autoWeek?computedWeek():null;
   if(cw===null||cw<=curWeek){el.style.display='none';return;}
   var name=lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le;
+  var pl=postponeDaysLeft();
   el.style.display='block';
   el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.autoNewWeek+'</div>'+
     '<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">'+l.autoNewWeekSub.replace('{w}',name)+'</div>'+
     '<div style="display:flex;gap:8px;">'+
     '<button class="gbtn" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="advanceToComputed()">'+l.btnAdvance.replace('{w}',name)+'</button>'+
-    '<button class="ghostb" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="postponeWeek()">'+l.btnPostpone+'</button></div>';
+    '<button class="ghostb" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;'+(pl>0?'opacity:.5;':'')+'" onclick="postponeWeek()">'+(pl>0?l.postponeWait.replace('{n}',pl):l.btnPostpone)+'</button></div>';
 }
 
 // ===== PRILEPIN VOLUME =====
@@ -1775,7 +1794,7 @@ function collectPrefixedForExport(prefix){
   return out;
 }
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,dweek:dweek,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,lastPostpone:lastPostpone,dweek:dweek,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -1795,8 +1814,9 @@ function importData(e){
       if(d.body)bodyMetrics=Object.assign({bw:null,ht:null,sex:'m'},d.body);
       if(d.autoWeek!=null)autoWeek=!!d.autoWeek;
       if(d.cycleStart)cycleStart=d.cycleStart;
+      if(d.lastPostpone)lastPostpone=d.lastPostpone;
       if(d.dweek)dweek=d.dweek;
-      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('dweek',dweek);
+      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('lastPostpone',lastPostpone);lset('dweek',dweek);
       if(d.extras){Object.keys(d.extras).forEach(function(dateKey){setExtras(dateKey,d.extras[dateKey]);});}
       if(d.madj){Object.keys(d.madj).forEach(function(dateKey){lset('madj_'+dateKey,d.madj[dateKey]);});}
       applyLang();renderHeader();renderToday();renderPRInputs();
