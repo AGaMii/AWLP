@@ -342,7 +342,12 @@ select.pinp{appearance:none;}
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="AUTO_HINT"></div>
       <div class="ltog" id="AUTO_ROW"></div>
       <div class="dbox" id="AUTO_BOX" style="margin-top:10px;"></div>
-      <button class="ghostb" id="BTN_POSTPONE_SET" onclick="postponeWeek()" style="margin-top:0;"></button>
+      <div class="prow" id="AUTO_START_ROW" style="margin-top:10px;">
+        <span class="plbl" id="AUTO_START_INPUT_L"></span>
+        <input class="pinp" id="AUTO_START_INPUT" type="date" onchange="setCycleStartDate(this.value)">
+      </div>
+      <button class="ghostb" id="BTN_FIX_DRIFT" onclick="fixDrift()" style="margin-top:0;"></button>
+      <button class="ghostb" id="BTN_POSTPONE_SET" onclick="postponeWeek()"></button>
       <button class="ghostb" id="BTN_START_TODAY" onclick="startCycleToday()"></button>
     </div>
     <div class="card">
@@ -678,6 +683,12 @@ var LNG={
   btnPostponeLong:'⏸ 이번 주 못 가요 — 한 주 미루기',
   needCycleStart:'먼저 사이클 시작일을 설정해주세요',
   postponeWait:'⏳ 미루기 완료 — {n}일 후 다시 가능',
+  autoStartInputL:'시작일 직접 지정',
+  driftL:'밀린 정도',driftVal:'{n}주',
+  driftTitle:'⚠️ 미루기가 누적돼 있어요',
+  driftSub:'미루기가 {n}주 쌓여서 날짜와 진행 주차가 어긋났어요. 지금 진행 중인 {w}를 이번 주로 맞추면 다음 주부터 원래 순서대로 이어집니다.',
+  btnFixDrift:'🔧 미루기 되돌리기 — 이번 주에 맞추기',
+  driftFixed:'이번 주 기준으로 복구했어요',
   postponeBlocked:'이미 이번 주를 미뤘어요. {n}일 후에 다시 미룰 수 있어요.',
   postponed:'한 주 미뤘어요',advanced:'주차 이동',
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
@@ -733,6 +744,12 @@ var LNG={
   btnPostponeLong:'\u23f8 Missing this week - postpone by one',
   needCycleStart:'Set a cycle start date first',
   postponeWait:'\u23f3 Postponed - available again in {n}d',
+  autoStartInputL:'Set start date',
+  driftL:'Drift',driftVal:'{n} wk',
+  driftTitle:'\u26a0\ufe0f Postpones have piled up',
+  driftSub:'{n} week(s) of postponing put the calendar out of sync. Align your current {w} to this week and the schedule resumes in order from next week.',
+  btnFixDrift:'\ud83d\udd27 Undo postpones - align to this week',
+  driftFixed:'Realigned to this week',
   postponeBlocked:'Already postponed this week. Available again in {n} day(s).',
   postponed:'Postponed by one week',advanced:'Week changed',
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
@@ -862,6 +879,7 @@ function applyLang(){
   document.getElementById('AUTO_HINT').textContent=l.autoHint;
   document.getElementById('BTN_START_TODAY').textContent=l.btnStartToday;
   document.getElementById('BTN_POSTPONE_SET').textContent=l.btnPostponeLong;
+  document.getElementById('AUTO_START_INPUT_L').textContent=l.autoStartInputL;
   renderAutoRow();renderAutoBox();
   document.getElementById('S_DOW').textContent=l.sDow;
   document.getElementById('BTN_SAVE_DOW').textContent=l.btnSaveDow;
@@ -973,12 +991,23 @@ function renderAutoBox(){
   var box=document.getElementById('AUTO_BOX');
   if(!box)return;
   var pb=document.getElementById('BTN_POSTPONE_SET');
+  var fb=document.getElementById('BTN_FIX_DRIFT');
+  var row=document.getElementById('AUTO_START_ROW');
+  var inp=document.getElementById('AUTO_START_INPUT');
+  var drift=weekDrift();
+  if(row)row.style.display=autoWeek?'flex':'none';
+  if(inp&&cycleStart)inp.value=cycleStart;
   if(pb){
     pb.style.display=autoWeek?'block':'none';
     var pl=postponeDaysLeft();
     pb.textContent=pl>0?l.postponeWait.replace('{n}',pl):l.btnPostponeLong;
     pb.disabled=pl>0;
     pb.style.opacity=pl>0?'.5':'1';
+  }
+  if(fb){
+    fb.style.display=(autoWeek&&drift>0)?'block':'none';
+    fb.textContent=l.btnFixDrift;
+    fb.style.color='var(--g)';fb.style.borderColor='rgba(29,158,117,.5)';
   }
   if(!autoWeek){
     box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.autoOffMsg+'</div>';
@@ -990,7 +1019,8 @@ function renderAutoBox(){
   box.innerHTML=
     '<div class="drow"><span>'+l.autoStartL+'</span><span><b>'+(cycleStart||l.cycleStartNone)+'</b></span></div>'+
     '<div class="drow"><span>'+l.autoNowL+'</span><span><b style="color:var(--b)">'+cwName+'</b></span></div>'+
-    '<div class="drow"><span>'+l.autoSavedL+'</span><span><b style="color:var(--g)">'+curName+'</b></span></div>';
+    '<div class="drow"><span>'+l.autoSavedL+'</span><span><b style="color:var(--g)">'+curName+'</b></span></div>'+
+    (drift>0?'<div class="drow"><span style="color:var(--r)">'+l.driftL+'</span><span><b style="color:var(--r)">'+l.driftVal.replace('{n}',drift)+'</b></span></div>':'');
 }
 
 // ===== BODY METRICS & LEVEL =====
@@ -1125,12 +1155,46 @@ function postponeWeek(){
   if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
   toast(L().postponed);
 }
+// Over-postponing pushes cycleStart into the future, so the calendar-derived week falls
+// *behind* the week you've actually completed. That gap is the drift we can auto-detect and undo.
+function weekDrift(){
+  if(!autoWeek||!cycleStart)return 0;
+  var cw=computedWeek();
+  return cw===null?0:(curWeek-cw);
+}
+function fixDrift(){
+  if(!cycleStart){toast(L().needCycleStart);return;}
+  reanchorCycle(curWeek);
+  lastPostpone=null;lset('lastPostpone',null);
+  renderToday();
+  if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
+  if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
+  toast(L().driftFixed);
+}
+function setCycleStartDate(v){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v||''))return;
+  cycleStart=v;lset('cycleStart',cycleStart);
+  lastPostpone=null;lset('lastPostpone',null);
+  renderToday();renderAutoBox();
+  if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
+  toast(L().saved);
+}
 function renderAutoWeekBanner(){
   var el=document.getElementById('AUTOWEEK_BANNER');
   if(!el)return;
   var l=L();
   var cw=autoWeek?computedWeek():null;
-  if(cw===null||cw<=curWeek){el.style.display='none';return;}
+  if(cw===null){el.style.display='none';return;}
+  if(cw<curWeek){
+    var dr=curWeek-cw;
+    el.style.display='block';
+    el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.driftTitle+'</div>'+
+      '<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">'+
+        l.driftSub.replace('{n}',dr).replace('{w}',lang==='ko'?W().lk:W().le)+'</div>'+
+      '<button class="gbtn" style="margin-top:0;padding:9px 6px;font-size:12.5px;" onclick="fixDrift()">'+l.btnFixDrift+'</button>';
+    return;
+  }
+  if(cw===curWeek){el.style.display='none';return;}
   var name=lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le;
   var pl=postponeDaysLeft();
   el.style.display='block';
