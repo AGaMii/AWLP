@@ -662,6 +662,8 @@ var LNG={
   ratioCJ:'C&J / 체중',ratioSnatch:'스내치 / 체중',bmiLabel:'BMI',sinclairLabel:'Sinclair (참고)',
   lvlNames:{entry:'입문',novice:'초중급',inter:'중상급',semipro:'준프로급',national:'국가대표급'},
   levelFoot:'레벨은 Sinclair 점수 구간(공개 벤치마크: Local 300 / Regional 350 / National 400 / International 450+)으로 추정해요. 계수는 IWF 2017–2020 공식 발표값이며, 여성 구간은 남성의 약 65% 근사치라 공식 수치는 아니에요. 참고용으로만 활용해주세요.',
+  dwkAssumed:'미기록',
+  prWeekEta:'🏆 11주차(기록 도전) 예상 기간: {a} ~ {b}',
   sAuto:'자동 주차 진행',
   autoHint:'사이클 시작일 기준으로 새 주가 되면 다음 주차를 제안해요. 자동으로 넘어가지는 않고, 확인 후 진행하거나 못 하신 주는 미룰 수 있어요.',
   autoNames:{on:'자동 제안',off:'수동'},
@@ -711,6 +713,8 @@ var LNG={
   ratioCJ:'C&J / BW',ratioSnatch:'Snatch / BW',bmiLabel:'BMI',sinclairLabel:'Sinclair (approx.)',
   lvlNames:{entry:'Entry',novice:'Novice',inter:'Intermediate',semipro:'Semi-pro',national:'National'},
   levelFoot:'Level is estimated from Sinclair score bands (public benchmarks: Local 300 / Regional 350 / National 400 / International 450+). Coefficients are IWF\'s official 2017-2020 values; female bands are an unofficial ~65%-of-male approximation. Reference only.',
+  dwkAssumed:'not recorded',
+  prWeekEta:'🏆 Week 11 (PR week) projected: {a} ~ {b}',
   sAuto:'Auto week advance',
   autoHint:'When a new week starts (based on your cycle start date), the app suggests the next week. It never advances silently - you confirm, or postpone a week you had to miss.',
   autoNames:{on:'Suggest',off:'Manual'},
@@ -753,6 +757,10 @@ function lget(k,d){try{var v=localStorage.getItem('wl2_'+k);return v!=null?JSON.
 function lset(k,v){try{localStorage.setItem('wl2_'+k,JSON.stringify(v));}catch(e){}}
 
 var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
+// dweek: { 'YYYY-MM-DD': weekIdx } - which program week a given date was trained under.
+// Stamped once, on the first time anything is recorded for that date, and never overwritten,
+// so editing an old session later can't rewrite its history.
+var dweek=lget('dweek',{});
 var curWeek=Math.min(lget('week',0),11);
 // Auto week advance (opt-in): cycleStart is the date Week 1 began. The date-derived week is only
 // ever a *suggestion* shown as a banner - the user confirms, or postpones a week they had to miss.
@@ -803,6 +811,8 @@ function setKey(ds,di,ei,si){return ds+'-'+di+'-'+ei+'-'+si;}
 function dateWorkoutDay(date){var d=date.getDay();var i=wDows.indexOf(d);return i===-1?null:i;}
 function hasLog(ds){return Object.keys(setStates).some(function(k){return k.indexOf(ds)===0&&(setStates[k]==='d'||setStates[k]==='f');});}
 function isPRWeek(){return curWeek===10;}
+function stampWeek(ds){if(dweek[ds]==null){dweek[ds]=curWeek;lset('dweek',dweek);}}
+function weekOf(ds){return dweek[ds]!=null?dweek[ds]:null;}
 function extraScope(){return todayStr()+'-D'+curDay;}
 function getExtras(scope){return lget('extra_'+scope,[]);}
 function setExtras(scope,arr){lset('extra_'+scope,arr);}
@@ -1247,6 +1257,7 @@ function renderToday(){
   renderAutoWeekBanner();
 }
 function tapSet(ds,di,ei,si,rest){
+  stampWeek(ds);
   var k=setKey(ds,di,ei,si);
   var c=setStates[k]||'p';
   setStates[k]=c==='p'?'d':c==='d'?'f':'p';
@@ -1364,6 +1375,7 @@ function adjExtraField(uid,field,delta){
   renderExtras();renderVolumeBanner();
 }
 function tapExtraSet(uid,si){
+  stampWeek(todayStr());
   var scope=extraScope();
   var k=extraSetKey(scope,uid,si);
   var c=setStates[k]||'p';
@@ -1376,6 +1388,7 @@ function tapExtraSet(uid,si){
 // ===== SAVE SESSION TO GRAPH =====
 function saveTodayToGraph(){
   var ds=todayStr(),dd=W().days[curDay],saved=0;
+  stampWeek(ds);
   dd.ex.forEach(function(ex,ei){
     if(!ex.log||ex.ladder)return;
     var adj=getAdj(ds,curDay,ei);
@@ -1457,13 +1470,21 @@ function renderCal(){
     var ds=dStr(calY,calM,d);
     var di=dateWorkoutDay(new Date(calY,calM,d));
     var cls='cday'+(di!==null?' wday':'')+(hasLog(ds)?' hlog':'')+(ds===todayKey?' today':'')+(ds===calSel?' sel':'');
-    var lbl=di!==null?'<span style="font-size:8px;color:'+(ds===calSel?'#fff':'var(--g)')+';font-weight:600;">D'+(di+1)+'</span>':'';
+    var rw=weekOf(ds);
+    var lblTxt=rw!=null?(rw===10?'🏆':'W'+(rw+1)):(di!==null?'D'+(di+1):'');
+    var lblCol=ds===calSel?'#fff':(rw!=null?'var(--b)':'var(--g)');
+    var lbl=lblTxt?'<span style="font-size:8px;color:'+lblCol+';font-weight:600;">'+lblTxt+'</span>':'';
     html+='<div class="'+cls+'" onclick="selCal(\''+ds+'\','+di+')"><div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span>'+d+'</span>'+lbl+'</div></div>';
   }
   document.getElementById('CAL_DAYS').innerHTML=html;
-  document.getElementById('CAL_LEGEND').textContent=lang==='ko'
-    ?'🏆 11주차(기록 도전 주간)의 Day 1(스내치)·Day 2(클린&저크)에서 신기록을 시도하세요.'
-    :'🏆 Attempt new records on Day 1 (snatch) and Day 2 (C&J) of Week 11.';
+  var legend=lang==='ko'
+    ?'W# = 그날 수행한 주차(기록됨) · D# = 예정 훈련일 · 🏆 = 기록 도전 주간'
+    :'W# = week actually trained (recorded) · D# = scheduled day · 🏆 = PR week';
+  if(cycleStart){
+    var pa=shiftDateStr(cycleStart,10*7),pb=shiftDateStr(cycleStart,10*7+6);
+    legend+='<br>'+l.prWeekEta.replace('{a}',pa).replace('{b}',pb);
+  }
+  document.getElementById('CAL_LEGEND').innerHTML=legend;
   if(calSel)renderCalDet(calSel);
 }
 function selCal(ds,di){calSel=ds;renderCal();renderCalDet(ds,di);}
@@ -1481,13 +1502,20 @@ function renderCalDet(ds,diOvr){
     det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div><div style="font-size:13px;color:var(--tx2);">'+l.restDay+'</div>';
     return;
   }
-  var dd=W().days[di];
+  // render against the week this date was actually trained under, not the week currently in view
+  var rec=weekOf(ds);
+  var wkIdx=rec!=null?rec:curWeek;
+  var dd=WEEKS[wkIdx].days[di];
+  var wkName=lang==='ko'?WEEKS[wkIdx].lk:WEEKS[wkIdx].le;
+  var wkTag='<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;margin-left:6px;white-space:nowrap;'+
+    (rec!=null?'background:rgba(29,158,117,.14);color:var(--g);':'background:var(--sf);color:var(--tx3);')+
+    '">'+wkName+(rec!=null?'':' · '+l.dwkAssumed)+'</span>';
   var dowN=l.dowNames[date.getDay()];
   var tot=0,done=0;
   dd.ex.forEach(function(ex,ei){var n=ex.ladder||ex.acc?ex.sets:effSets(ex,getAdj(ds,di,ei));for(var s=0;s<n;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
   det.style.display='block';
   det.innerHTML=
-    '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — Day '+(di+1)+'</div>'+
+    '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — Day '+(di+1)+wkTag+'</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:10px;">'+
     '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--g);">'+done+'</div><div style="font-size:10px;color:var(--tx2);">'+l.doneSets+'</div></div>'+
     '<div style="flex:1;background:var(--sf);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--tx);">'+(tot-done)+'</div><div style="font-size:10px;color:var(--tx2);">'+l.remaining+'</div></div>'+
@@ -1736,7 +1764,7 @@ function collectPrefixedForExport(prefix){
   return out;
 }
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,dweek:dweek,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -1756,7 +1784,8 @@ function importData(e){
       if(d.body)bodyMetrics=Object.assign({bw:null,ht:null,sex:'m'},d.body);
       if(d.autoWeek!=null)autoWeek=!!d.autoWeek;
       if(d.cycleStart)cycleStart=d.cycleStart;
-      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);
+      if(d.dweek)dweek=d.dweek;
+      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('dweek',dweek);
       if(d.extras){Object.keys(d.extras).forEach(function(dateKey){setExtras(dateKey,d.extras[dateKey]);});}
       if(d.madj){Object.keys(d.madj).forEach(function(dateKey){lset('madj_'+dateKey,d.madj[dateKey]);});}
       applyLang();renderHeader();renderToday();renderPRInputs();
