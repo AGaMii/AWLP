@@ -167,6 +167,7 @@ select.pinp{appearance:none;}
         <button class="abtn" onclick="changeDay(1)">&#8250;</button>
       </div>
     </div>
+    <div id="AUTOWEEK_BANNER" style="display:none;background:linear-gradient(135deg,rgba(55,138,221,.12),rgba(29,158,117,.10));border:.5px solid rgba(55,138,221,.4);border-radius:var(--ra);padding:12px 14px;margin-bottom:12px;"></div>
     <div class="card" id="VOL_BANNER" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;"></div>
     <div class="card" id="WARM_SECTION" style="padding:14px;">
       <div class="ct"><i class="ti ti-flame"></i> <span id="WARM_TITLE"></span></div>
@@ -335,6 +336,13 @@ select.pinp{appearance:none;}
           <option value="5">5 kg</option>
         </select>
       </div>
+    </div>
+    <div class="card">
+      <div class="ct"><i class="ti ti-calendar-repeat"></i> <span id="S_AUTO"></span></div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="AUTO_HINT"></div>
+      <div class="ltog" id="AUTO_ROW"></div>
+      <div class="dbox" id="AUTO_BOX" style="margin-top:10px;"></div>
+      <button class="ghostb" id="BTN_START_TODAY" onclick="startCycleToday()" style="margin-top:0;"></button>
     </div>
     <div class="card">
       <div class="ct"><i class="ti ti-calendar-week"></i> <span id="S_DOW"></span></div>
@@ -654,6 +662,17 @@ var LNG={
   ratioCJ:'C&J / 체중',ratioSnatch:'스내치 / 체중',bmiLabel:'BMI',sinclairLabel:'Sinclair (참고)',
   lvlNames:{entry:'입문',novice:'초중급',inter:'중상급',semipro:'준프로급',national:'국가대표급'},
   levelFoot:'레벨은 Sinclair 점수 구간(공개 벤치마크: Local 300 / Regional 350 / National 400 / International 450+)으로 추정해요. 계수는 IWF 2017–2020 공식 발표값이며, 여성 구간은 남성의 약 65% 근사치라 공식 수치는 아니에요. 참고용으로만 활용해주세요.',
+  sAuto:'자동 주차 진행',
+  autoHint:'사이클 시작일 기준으로 새 주가 되면 다음 주차를 제안해요. 자동으로 넘어가지는 않고, 확인 후 진행하거나 못 하신 주는 미룰 수 있어요.',
+  autoNames:{on:'자동 제안',off:'수동'},
+  autoStartL:'사이클 시작일 (1주차)',autoNowL:'날짜 기준',autoSavedL:'현재 진행 주차',
+  cycleStartNone:'미설정',btnStartToday:'이번 주를 1주차로 시작하기',
+  confirmStartToday:'이번 주를 1주차 시작으로 설정할까요? 진행 주차가 1주차로 초기화됩니다. (기록·PR·설정은 그대로 유지)',
+  autoOffMsg:'수동 모드예요. 헤더의 [이전 주]/[다음 주] 버튼으로 직접 넘기면 그대로 저장됩니다.',
+  autoNewWeek:'📅 새로운 주가 시작됐어요',
+  autoNewWeekSub:'날짜 기준으로는 {w}입니다. 진행할까요? 지난주에 운동을 못 하셨다면 미루고 한 주 더 유지할 수 있어요.',
+  btnAdvance:'{w}로 진행',btnPostpone:'한 주 미루기',
+  postponed:'한 주 미뤘어요',advanced:'주차 이동',
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
   dowNames:['일','월','화','수','목','금','토'],
   sData:'데이터 관리',btnExp:'JSON으로 내보내기',btnImp:'JSON 불러오기',btnResetAll:'전체 세트 초기화',
@@ -692,6 +711,17 @@ var LNG={
   ratioCJ:'C&J / BW',ratioSnatch:'Snatch / BW',bmiLabel:'BMI',sinclairLabel:'Sinclair (approx.)',
   lvlNames:{entry:'Entry',novice:'Novice',inter:'Intermediate',semipro:'Semi-pro',national:'National'},
   levelFoot:'Level is estimated from Sinclair score bands (public benchmarks: Local 300 / Regional 350 / National 400 / International 450+). Coefficients are IWF\'s official 2017-2020 values; female bands are an unofficial ~65%-of-male approximation. Reference only.',
+  sAuto:'Auto week advance',
+  autoHint:'When a new week starts (based on your cycle start date), the app suggests the next week. It never advances silently - you confirm, or postpone a week you had to miss.',
+  autoNames:{on:'Suggest',off:'Manual'},
+  autoStartL:'Cycle start (Week 1)',autoNowL:'By date',autoSavedL:'Current week',
+  cycleStartNone:'not set',btnStartToday:'Start Week 1 this week',
+  confirmStartToday:'Set this week as Week 1? Your current week resets to Week 1. (Records, PRs and settings are kept.)',
+  autoOffMsg:'Manual mode. Use the Prev/Next Week buttons in the header - your choice is saved.',
+  autoNewWeek:'📅 A new week has started',
+  autoNewWeekSub:'By the calendar you are in {w}. Move on? If you missed last week, postpone and stay another week.',
+  btnAdvance:'Go to {w}',btnPostpone:'Postpone a week',
+  postponed:'Postponed by one week',advanced:'Week changed',
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
   dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
   sData:'Data',btnExp:'Export JSON',btnImp:'Import JSON',btnResetAll:'Reset all sets',
@@ -724,9 +754,11 @@ function lset(k,v){try{localStorage.setItem('wl2_'+k,JSON.stringify(v));}catch(e
 
 var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
 var curWeek=Math.min(lget('week',0),11);
-// anchorWeek is the actually-saved program week; curWeek can diverge from it while browsing
-// via the prev/next-week buttons without overwriting saved progress. goToday() snaps back.
-var anchorWeek=curWeek;
+// Auto week advance (opt-in): cycleStart is the date Week 1 began. The date-derived week is only
+// ever a *suggestion* shown as a banner - the user confirms, or postpones a week they had to miss.
+// Training progress follows what you actually did, not the calendar, so nothing advances silently.
+var autoWeek=lget('autoWeek',false);
+var cycleStart=lget('cycleStart',null);
 var wDows=lget('dows',[1,2,4,5]);
 var lang=lget('lang','ko');
 var roundUnit=lget('roundUnit',2.5);
@@ -804,6 +836,10 @@ function applyLang(){
   document.getElementById('BTN_APPLY_TIER').textContent=l.applyTier;
   document.getElementById('LEVEL_FOOT').textContent=l.levelFoot;
   renderLevelBox();
+  document.getElementById('S_AUTO').textContent=l.sAuto;
+  document.getElementById('AUTO_HINT').textContent=l.autoHint;
+  document.getElementById('BTN_START_TODAY').textContent=l.btnStartToday;
+  renderAutoRow();renderAutoBox();
   document.getElementById('S_DOW').textContent=l.sDow;
   document.getElementById('BTN_SAVE_DOW').textContent=l.btnSaveDow;
   document.getElementById('S_DATA').textContent=l.sData;
@@ -903,6 +939,29 @@ function renderVolTierRow(){
   }).join('');
 }
 
+function renderAutoRow(){
+  var l=L();
+  document.getElementById('AUTO_ROW').innerHTML=[['on',true],['off',false]].map(function(p){
+    return '<button class="lbtn'+(autoWeek===p[1]?' active':'')+'" onclick="setAutoWeek('+p[1]+')">'+l.autoNames[p[0]]+'</button>';
+  }).join('');
+}
+function renderAutoBox(){
+  var l=L();
+  var box=document.getElementById('AUTO_BOX');
+  if(!box)return;
+  if(!autoWeek){
+    box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.autoOffMsg+'</div>';
+    return;
+  }
+  var cw=computedWeek();
+  var cwName=cw===null?'—':(lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le);
+  var curName=lang==='ko'?W().lk:W().le;
+  box.innerHTML=
+    '<div class="drow"><span>'+l.autoStartL+'</span><span><b>'+(cycleStart||l.cycleStartNone)+'</b></span></div>'+
+    '<div class="drow"><span>'+l.autoNowL+'</span><span><b style="color:var(--b)">'+cwName+'</b></span></div>'+
+    '<div class="drow"><span>'+l.autoSavedL+'</span><span><b style="color:var(--g)">'+curName+'</b></span></div>';
+}
+
 // ===== BODY METRICS & LEVEL =====
 function sinclairTotal(total,bw,sex){
   if(!bw||bw<=0)return null;
@@ -973,14 +1032,73 @@ function renderHeader(){
   var w=W();
   document.getElementById('H_SUB').textContent=(lang==='ko'?w.lk:w.le)+' · 12'+(lang==='ko'?'주 사이클':'-week cycle');
 }
-function cycleWeek(d){curWeek=(curWeek+(d||1)+12)%12;renderHeader();renderToday();if(document.getElementById('screen-program').classList.contains('active'))renderProgram();toast(lang==='ko'?W().lk:W().le);}
+function setWeek(i,reanchor){
+  curWeek=(i+12)%12;
+  lset('week',curWeek);
+  if(reanchor!==false&&autoWeek)reanchorCycle(curWeek);
+  renderHeader();renderToday();
+  if(document.getElementById('screen-program').classList.contains('active'))renderProgram();
+  if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
+}
+function cycleWeek(d){setWeek(curWeek+(d||1));toast(lang==='ko'?W().lk:W().le);}
 function goToday(){
-  curWeek=anchorWeek;
   var a=detectTodayDayIdx();
   if(a!==null){curDay=a;lset('day',curDay);}
   renderHeader();
   sw('today');
   toast(lang==='ko'?'오늘로 이동':'Jumped to today');
+}
+
+// ===== AUTO WEEK ADVANCE =====
+function parseDate(s){return new Date(s+'T00:00:00');}
+function shiftDateStr(s,days){var t=parseDate(s);t.setDate(t.getDate()+days);return dStr(t.getFullYear(),t.getMonth(),t.getDate());}
+function computedWeek(){
+  if(!cycleStart)return null;
+  var d=Math.floor((parseDate(todayStr())-parseDate(cycleStart))/86400000);
+  if(d<0)return 0;
+  return Math.max(0,Math.min(11,Math.floor(d/7)));
+}
+// re-anchor so that the given week index is "this week" by the calendar
+function reanchorCycle(wk){cycleStart=shiftDateStr(todayStr(),-wk*7);lset('cycleStart',cycleStart);}
+function setAutoWeek(on){
+  autoWeek=!!on;lset('autoWeek',autoWeek);
+  if(autoWeek&&!cycleStart)reanchorCycle(curWeek);
+  renderAutoRow();renderAutoBox();renderToday();
+  toast(L().autoNames[autoWeek?'on':'off']);
+}
+function startCycleToday(){
+  if(!confirm(L().confirmStartToday))return;
+  reanchorCycle(0);
+  setWeek(0,false);
+  renderAutoBox();
+  toast(L().saved);
+}
+function advanceToComputed(){
+  var cw=computedWeek();if(cw===null)return;
+  setWeek(cw,false);
+  toast(L().advanced+' — '+(lang==='ko'?W().lk:W().le));
+}
+function postponeWeek(){
+  var cw=computedWeek();if(cw===null)return;
+  var diff=cw-curWeek;if(diff<=0)return;
+  cycleStart=shiftDateStr(cycleStart,diff*7);lset('cycleStart',cycleStart);
+  renderToday();
+  if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
+  toast(L().postponed);
+}
+function renderAutoWeekBanner(){
+  var el=document.getElementById('AUTOWEEK_BANNER');
+  if(!el)return;
+  var l=L();
+  var cw=autoWeek?computedWeek():null;
+  if(cw===null||cw<=curWeek){el.style.display='none';return;}
+  var name=lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le;
+  el.style.display='block';
+  el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.autoNewWeek+'</div>'+
+    '<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">'+l.autoNewWeekSub.replace('{w}',name)+'</div>'+
+    '<div style="display:flex;gap:8px;">'+
+    '<button class="gbtn" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="advanceToComputed()">'+l.btnAdvance.replace('{w}',name)+'</button>'+
+    '<button class="ghostb" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="postponeWeek()">'+l.btnPostpone+'</button></div>';
 }
 
 // ===== PRILEPIN VOLUME =====
@@ -1126,6 +1244,7 @@ function renderToday(){
   });
   renderVolumeBanner();
   renderExtras();
+  renderAutoWeekBanner();
 }
 function tapSet(ds,di,ei,si,rest){
   var k=setKey(ds,di,ei,si);
@@ -1444,6 +1563,8 @@ function renderPRInputs(){
   tmpDows=wDows.slice();
   renderDowGrid();
   renderVolTierRow();
+  renderAutoRow();
+  renderAutoBox();
   renderBodyInputs();
   updDrv();
 }
@@ -1495,7 +1616,7 @@ function renderProgram(){
     list.appendChild(d);
   });
 }
-function selWeek(i){curWeek=i;anchorWeek=i;lset('week',i);renderProgram();renderToday();renderHeader();}
+function selWeek(i){setWeek(i);}
 
 // ===== TIPS =====
 function renderTips(){
@@ -1615,7 +1736,7 @@ function collectPrefixedForExport(prefix){
   return out;
 }
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -1628,12 +1749,14 @@ function importData(e){
     try{
       var d=JSON.parse(ev.target.result);
       if(d.prs)prs=d.prs;if(d.logs)logs=d.logs;
-      if(d.curWeek!=null){curWeek=Math.min(d.curWeek,11);anchorWeek=curWeek;}
+      if(d.curWeek!=null)curWeek=Math.min(d.curWeek,11);
       if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
       if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
       if(d.volTier&&VOL_TIER_MULT[d.volTier])volTier=d.volTier;
       if(d.body)bodyMetrics=Object.assign({bw:null,ht:null,sex:'m'},d.body);
-      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);
+      if(d.autoWeek!=null)autoWeek=!!d.autoWeek;
+      if(d.cycleStart)cycleStart=d.cycleStart;
+      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);
       if(d.extras){Object.keys(d.extras).forEach(function(dateKey){setExtras(dateKey,d.extras[dateKey]);});}
       if(d.madj){Object.keys(d.madj).forEach(function(dateKey){lset('madj_'+dateKey,d.madj[dateKey]);});}
       applyLang();renderHeader();renderToday();renderPRInputs();
