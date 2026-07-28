@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="역도 트레이너">
 <meta name="theme-color" content="#1D9E75">
 <title>역도 트레이너</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/tabler-icons.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/tabler-icons.min.css" media="print" onload="this.media='all'">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
 <style>
 :root{--g:#1D9E75;--gl:#E1F5EE;--gd:#0F6E56;--r:#E24B4A;--b:#378ADD;--o:#BA7517;--bg:#f5f5f5;--card:#fff;--tx:#1a1a1a;--tx2:#666;--tx3:#999;--bd:rgba(0,0,0,0.12);--bd2:rgba(0,0,0,0.2);--sf:#f0f0f0;--ra:12px;--rs:8px;}
 @media(prefers-color-scheme:dark){:root{--bg:#111;--card:#1e1e1e;--tx:#f0f0f0;--tx2:#aaa;--tx3:#666;--bd:rgba(255,255,255,0.1);--bd2:rgba(255,255,255,0.2);--sf:#2a2a2a;}}
@@ -23,7 +23,8 @@ body{display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
 .hdr-btn{background:rgba(255,255,255,.2);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;border:none;color:#fff;}
 .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--card);border-top:.5px solid var(--bd);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 2px 8px;cursor:pointer;border:none;background:none;color:var(--tx3);font-size:9.5px;gap:3px;}
-.ni i{font-size:21px;}
+.ni i{font-size:21px;min-height:21px;}
+.ni span{min-height:11px;}
 .ni.active{color:var(--g);}
 .scroll{flex:1;overflow-y:auto;padding:14px 14px calc(70px + env(safe-area-inset-bottom));}
 .screen{display:none;}.screen.active{display:block;}
@@ -1913,6 +1914,11 @@ function renderGraph(){
     }).join('');
   }
   var canvas=document.getElementById('G_CHART');
+  if(typeof Chart==='undefined'){
+    // library still in flight (or blocked): retry shortly, never throw
+    if(!renderGraph._retry){renderGraph._retry=1;setTimeout(function(){renderGraph._retry=0;renderGraph();},1200);}
+    return;
+  }
   if(chartInst){chartInst.destroy();chartInst=null;}
   var allDates=logs.map(function(x){return x.date;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
   if(!allDates.length)return;
