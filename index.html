@@ -168,11 +168,13 @@ select.pinp{appearance:none;}
         <button class="abtn" onclick="changeDay(1)">&#8250;</button>
       </div>
     </div>
+    <div id="STORAGE_WARN" style="display:none;background:rgba(226,75,74,.10);border:1px solid rgba(226,75,74,.45);border-radius:var(--ra);padding:12px 14px;margin-bottom:12px;"></div>
     <div id="AUTOWEEK_BANNER" style="display:none;background:linear-gradient(135deg,rgba(55,138,221,.12),rgba(29,158,117,.10));border:.5px solid rgba(55,138,221,.4);border-radius:var(--ra);padding:12px 14px;margin-bottom:12px;"></div>
     <div class="card" id="VOL_BANNER" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;"></div>
     <div class="card" id="WARM_SECTION" style="padding:14px;">
       <div class="ct"><i class="ti ti-flame"></i> <span id="WARM_TITLE"></span></div>
       <div id="WARM_LIST"></div>
+      <button class="ghostb" id="BTN_REPEAT_WARM" onclick="repeatLastExtras('warm')" style="display:none;"></button>
       <button class="ghostb" id="BTN_ADD_WARM" onclick="toggleExtraPicker('warm')"></button>
       <div id="PICKER_warm" style="display:none;margin-top:10px;">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;" id="LIB_TITLE_warm"></div>
@@ -189,6 +191,7 @@ select.pinp{appearance:none;}
     <div class="card" id="ACC_SECTION" style="padding:14px;">
       <div class="ct"><i class="ti ti-plus"></i> <span id="ACC_TITLE"></span></div>
       <div id="ACC_LIST"></div>
+      <button class="ghostb" id="BTN_REPEAT_ACC" onclick="repeatLastExtras('acc')" style="display:none;"></button>
       <button class="ghostb" id="BTN_ADD_ACC" onclick="toggleExtraPicker('acc')"></button>
       <div id="PICKER_acc" style="display:none;margin-top:10px;">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;" id="LIB_TITLE_acc"></div>
@@ -696,6 +699,8 @@ var LNG={
   btnPostponeLong:'⏸ 이번 주 못 가요 — 한 주 미루기',
   needCycleStart:'먼저 사이클 시작일을 설정해주세요',
   badDate:'날짜 형식이 올바르지 않아요',
+  storeTitle:'⚠️ 저장이 되지 않고 있어요',
+  storeMsg:'브라우저가 이 사이트의 저장소를 막고 있어서, 진행 주차와 기록이 앱을 닫으면 사라집니다. 시크릿/프라이빗 모드를 끄거나, 브라우저 설정에서 이 사이트의 쿠키·사이트 데이터 허용을 확인해 주세요. 저장 공간이 가득 찬 경우에도 발생할 수 있어요.',
   postponeWait:'⏳ 미루기 완료 — {n}일 후 다시 가능',
   autoStartInputL:'시작일 직접 지정',
   driftL:'밀린 정도',driftVal:'{n}주',
@@ -726,6 +731,9 @@ var LNG={
   exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스',ohs:'오버헤드 스쿼트',eccdl:'익센트릭 DL',powersn:'파워 스내치',powercj:'파워 클린(+저크)'},
   logOpts:[{v:'snatch',l:'스내치'},{v:'cleanjerk',l:'클린&저크'},{v:'squat',l:'백 스쿼트'},{v:'frontsquat',l:'프론트 스쿼트'},{v:'press',l:'푸시 프레스'}],
   gFilters:[{k:'all',l:'전체'},{k:'snatch',l:'스내치'},{k:'cleanjerk',l:'클린&저크'},{k:'squat',l:'백스쿼트'},{k:'frontsquat',l:'프론트'},{k:'press',l:'푸시프레스'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'익센트릭DL'},{k:'powersn',l:'파워스내치'},{k:'powercj',l:'파워클린'}],
+  repeatPrev:'↺ 지난 세션 그대로 불러오기 ({d}, {n}개)',
+  prevExtrasLoaded:'{d} 세션에서 불러왔어요',
+  noPrevExtras:'불러올 이전 기록이 없어요',
   addExtraBtn:'+ 운동 추가',customPh:'운동 이름 직접 입력',addBtn:'추가',extraWtPh:'중량',setsLbl:'세트',repsLbl:'횟수',extraNone:'추가된 운동이 없어요',customTitle:'직접 입력',closePicker:'닫기',delBtn:'삭제',
   warmTitle:'웜업 운동',accTitle:'보조·마무리 운동',warmLibTitle:'추천 웜업',accLibTitle:'추천 보조·마무리',
   prevWeek:'이전 주',
@@ -764,6 +772,8 @@ var LNG={
   btnPostponeLong:'\u23f8 Missing this week - postpone by one',
   needCycleStart:'Set a cycle start date first',
   badDate:'That date is not valid',
+  storeTitle:'\u26a0\ufe0f Nothing is being saved',
+  storeMsg:'Your browser is blocking storage for this site, so your week and records disappear when the app closes. Turn off private/incognito mode, or allow cookies and site data for this site. A full storage quota can cause this too.',
   postponeWait:'\u23f3 Postponed - available again in {n}d',
   autoStartInputL:'Set start date',
   driftL:'Drift',driftVal:'{n} wk',
@@ -794,14 +804,42 @@ var LNG={
   exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press',ohs:'Overhead Squat',eccdl:'Eccentric DL',powersn:'Power Snatch',powercj:'Power Clean(+Jerk)'},
   logOpts:[{v:'snatch',l:'Snatch'},{v:'cleanjerk',l:'Clean & Jerk'},{v:'squat',l:'Back Squat'},{v:'frontsquat',l:'Front Squat'},{v:'press',l:'Push Press'}],
   gFilters:[{k:'all',l:'All'},{k:'snatch',l:'Snatch'},{k:'cleanjerk',l:'C&J'},{k:'squat',l:'Back Sq'},{k:'frontsquat',l:'Front Sq'},{k:'press',l:'Press'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'Ecc DL'},{k:'powersn',l:'Pwr Snatch'},{k:'powercj',l:'Pwr Clean'}],
+  repeatPrev:'\u21ba Repeat last session ({d}, {n})',
+  prevExtrasLoaded:'Loaded from {d}',
+  noPrevExtras:'No previous session to load',
   addExtraBtn:'+ Add Exercise',customPh:'Type exercise name',addBtn:'Add',extraWtPh:'Weight',setsLbl:'sets',repsLbl:'reps',extraNone:'No exercises added',customTitle:'Custom',closePicker:'Close',delBtn:'Delete',
   warmTitle:'Warm-up',accTitle:'Accessories / Finishers',warmLibTitle:'Suggested warm-ups',accLibTitle:'Suggested accessories',
   prevWeek:'Prev Week',
   ladderReps:'3 attempts x1',accBadge:'ACC'}
 };
 // ===== STATE =====
+var storageOK=true, storageErr='';
 function lget(k,d){try{var v=localStorage.getItem('wl2_'+k);return v!=null?JSON.parse(v):d;}catch(e){return d;}}
-function lset(k,v){try{localStorage.setItem('wl2_'+k,JSON.stringify(v));}catch(e){}}
+function lset(k,v){
+  try{
+    localStorage.setItem('wl2_'+k,JSON.stringify(v));
+    return true;
+  }catch(e){
+    storageOK=false;storageErr=(e&&e.name)||'Error';
+    try{renderStorageWarn();}catch(e2){}
+    return false;
+  }
+}
+// Probe once at boot: write, read back, delete. Anything less than a full round-trip means
+// progress silently evaporates on reload, so the user must be told rather than left guessing.
+function checkStorage(){
+  try{
+    var k='wl2__probe';
+    localStorage.setItem(k,'1');
+    var ok=localStorage.getItem(k)==='1';
+    localStorage.removeItem(k);
+    storageOK=ok;
+    if(!ok)storageErr='ReadbackFailed';
+  }catch(e){
+    storageOK=false;storageErr=(e&&e.name)||'Blocked';
+  }
+  return storageOK;
+}
 
 var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
 // dweek: { 'YYYY-MM-DD': weekIdx } - which program week a given date was trained under.
@@ -1281,6 +1319,16 @@ function setCycleStartDate(v){
   if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
   toast(L().saved);
 }
+function renderStorageWarn(){
+  var el=document.getElementById('STORAGE_WARN');
+  if(!el)return;
+  if(storageOK){el.style.display='none';return;}
+  var l=L();
+  el.style.display='block';
+  el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--r);margin-bottom:5px;">'+l.storeTitle+'</div>'+
+    '<div style="font-size:12px;color:var(--tx);line-height:1.6;">'+l.storeMsg+'</div>'+
+    '<div style="font-size:10px;color:var(--tx3);margin-top:6px;">('+storageErr+')</div>';
+}
 function renderAutoWeekBanner(){
   var el=document.getElementById('AUTOWEEK_BANNER');
   if(!el)return;
@@ -1451,6 +1499,7 @@ function renderToday(){
   renderVolumeBanner();
   renderExtras();
   renderAutoWeekBanner();
+  renderStorageWarn();
 }
 function tapSet(ds,di,ei,si,rest){
   stampWeek(ds);
@@ -1466,7 +1515,7 @@ function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
 
 // ===== EXTRA EXERCISES (ad-hoc: warm-ups before main, accessories after) =====
 var pickerState={warm:false,acc:false};
-function renderExtras(){['warm','acc'].forEach(renderExtraCat);}
+function renderExtras(){['warm','acc'].forEach(function(c){renderExtraCat(c);renderRepeatBtn(c);});}
 function renderExtraCat(cat){
   var l=L();
   var scope=extraScope();
@@ -1505,6 +1554,47 @@ function renderExtraCat(cat){
     div.appendChild(srow);
     list.appendChild(div);
   });
+}
+// Extras are stored per date, so a new day always starts empty. Rather than re-adding the same
+// accessories by hand every session, pull forward the most recent day that had any.
+function lastExtrasFor(cat){
+  var today=todayStr(), best=null, bestKey='';
+  try{
+    Object.keys(localStorage).forEach(function(k){
+      var m=k.match(/^wl2_extra_(\d{4}-\d{2}-\d{2})-D(\d)$/);
+      if(!m)return;
+      if(m[1]>=today)return;
+      var arr=lget('extra_'+m[1]+'-D'+m[2],[]);
+      if(!Array.isArray(arr))return;
+      var hit=arr.filter(function(x){return (x.cat||'acc')===cat;});
+      if(!hit.length)return;
+      if(m[1]>bestKey){bestKey=m[1];best=hit;}
+    });
+  }catch(e){}
+  return best?{date:bestKey,items:best}:null;
+}
+function repeatLastExtras(cat){
+  var prev=lastExtrasFor(cat);
+  if(!prev){toast(L().noPrevExtras);return;}
+  var scope=extraScope();
+  var extras=getExtras(scope);
+  prev.items.forEach(function(x){
+    extras.push({uid:'e'+Date.now()+Math.floor(Math.random()*10000),cat:cat,
+      nameKo:x.nameKo,nameEn:x.nameEn,weight:x.weight,sets:x.sets,reps:x.reps,
+      pril:x.pril||null,noteKo:x.noteKo||'',noteEn:x.noteEn||''});
+  });
+  setExtras(scope,extras);
+  renderExtras();renderVolumeBanner();
+  toast(L().prevExtrasLoaded.replace('{d}',prev.date));
+}
+function renderRepeatBtn(cat){
+  var btn=document.getElementById(cat==='warm'?'BTN_REPEAT_WARM':'BTN_REPEAT_ACC');
+  if(!btn)return;
+  var prev=lastExtrasFor(cat);
+  var has=getExtras(extraScope()).some(function(x){return (x.cat||'acc')===cat;});
+  if(!prev||has){btn.style.display='none';return;}
+  btn.style.display='block';
+  btn.textContent=L().repeatPrev.replace('{d}',prev.date).replace('{n}',prev.items.length);
 }
 function toggleExtraPicker(cat){
   pickerState[cat]=!pickerState[cat];
@@ -2066,6 +2156,7 @@ function sanitizeState(){
   curDay=Math.max(0,Math.min(3,Math.floor(curDay)));
 }
 function bootApp(){
+  checkStorage();
   sanitizeState();
   applyLang();
   renderHeader();
@@ -2077,12 +2168,17 @@ try{
   // Last resort: rather than a blank unusable screen, wipe the volatile view-state keys
   // (never PRs, logs or history) and retry once, then surface a real message if it still fails.
   try{
-    ['week','day','lang','volTier','autoWeek','cycleStart','lastPostpone','heavySingles','roundUnit','dows']
-      .forEach(function(k){try{localStorage.removeItem('wl2_'+k);}catch(e){}});
-    lang='ko';curWeek=0;curDay=0;volTier='semipro';roundUnit=2.5;wDows=[1,2,4,5];
-    autoWeek=false;cycleStart=null;lastPostpone=null;heavySingles=false;
+    // Step 1: retry in-memory only. Never delete the saved week here - a one-off render
+    // failure must not cost the user their cycle progress.
+    lang=LNG[lang]?lang:'ko';
+    volTier=VOL_TIER_MULT[volTier]?volTier:'semipro';
+    if(!Array.isArray(wDows)||!wDows.length)wDows=[1,2,4,5];
+    if(typeof roundUnit!=='number'||!isFinite(roundUnit)||roundUnit<=0)roundUnit=2.5;
+    if(!isValidDateStr(cycleStart))cycleStart=null;
+    if(!isValidDateStr(lastPostpone))lastPostpone=null;
+    if(typeof curWeek!=='number'||!isFinite(curWeek))curWeek=0;
+    if(typeof curDay!=='number'||!isFinite(curDay))curDay=0;
     bootApp();
-    if(typeof toast==='function')toast('설정을 초기화하고 복구했어요 (기록·PR은 유지)');
   }catch(err2){
     var box=document.createElement('div');
     box.style.cssText='padding:20px;font-size:14px;line-height:1.7;color:#1a1a1a;background:#fff;';
