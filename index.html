@@ -708,6 +708,11 @@ var LNG={
   driftSub:'미루기가 {n}주 쌓여서 날짜와 진행 주차가 어긋났어요. 지금 진행 중인 {w}를 이번 주로 맞추면 다음 주부터 원래 순서대로 이어집니다.',
   btnFixDrift:'🔧 미루기 되돌리기 — 이번 주에 맞추기',
   driftFixed:'이번 주 기준으로 복구했어요',
+  cycleEndTitle:'🎉 12주 사이클을 완주했어요',
+  cycleEndSub:'사이클 마지막 주가 지났습니다. 새 PR을 설정 탭에 저장한 뒤 새 사이클을 시작하면, 모든 중량이 새 기준으로 다시 계산돼요.',
+  btnNewCycle:'🔄 이번 주부터 새 사이클 시작 (1주차)',
+  cycleEndShort:'사이클 종료',
+  newCycleDone:'새 사이클 1주차로 시작했어요 — 설정 탭에서 새 PR을 확인하세요',
   postponeBlocked:'이미 이번 주를 미뤘어요. {n}일 후에 다시 미룰 수 있어요.',
   postponed:'한 주 미뤘어요',advanced:'주차 이동',
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
@@ -781,6 +786,11 @@ var LNG={
   driftSub:'{n} week(s) of postponing put the calendar out of sync. Align your current {w} to this week and the schedule resumes in order from next week.',
   btnFixDrift:'\ud83d\udd27 Undo postpones - align to this week',
   driftFixed:'Realigned to this week',
+  cycleEndTitle:'\ud83c\udf89 You finished the 12-week cycle',
+  cycleEndSub:'The final week has passed. Save your new PRs in Settings, then start a new cycle - every load recalculates from the new maxes.',
+  btnNewCycle:'\ud83d\udd04 Start a new cycle this week (Week 1)',
+  cycleEndShort:'cycle finished',
+  newCycleDone:'New cycle started at Week 1 - check your PRs in Settings',
   postponeBlocked:'Already postponed this week. Available again in {n} day(s).',
   postponed:'Postponed by one week',advanced:'Week changed',
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
@@ -1140,7 +1150,7 @@ function renderAutoBox(){
     return;
   }
   var cw=computedWeek();
-  var cwName=cw===null?'—':(lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le);
+  var cwName=cw===null?'—':(cycleDone()?l.cycleEndShort:(lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le));
   var curName=lang==='ko'?W().lk:W().le;
   box.innerHTML=
     '<div class="drow"><span>'+l.autoStartL+'</span><span><b>'+(cycleStart||l.cycleStartNone)+'</b></span></div>'+
@@ -1252,12 +1262,32 @@ function shiftDateStr(s,days){
   var t=parseDate(s);t.setDate(t.getDate()+days);
   return dStr(t.getFullYear(),t.getMonth(),t.getDate());
 }
-function computedWeek(){
+// Raw (unclamped) elapsed week index. computedWeek() clamps to 11 for scheduling, which meant
+// that once 12 weeks had passed the app sat on "W12 recovery" forever: computed == curWeek, so
+// no banner ever fired and the cycle could never roll over to a fresh week 1.
+function rawCycleWeek(){
   if(!isValidDateStr(cycleStart))return null;
   var d=Math.floor((parseDate(todayStr())-parseDate(cycleStart))/86400000);
   if(!isFinite(d))return null;
-  if(d<0)return 0;
-  return Math.max(0,Math.min(11,Math.floor(d/7)));
+  return Math.floor(d/7);
+}
+function computedWeek(){
+  var r=rawCycleWeek();
+  if(r===null)return null;
+  if(r<0)return 0;
+  return Math.max(0,Math.min(11,r));
+}
+// true once the calendar has moved past the final week of the cycle
+function cycleDone(){
+  var r=rawCycleWeek();
+  return r!==null && r>11;
+}
+function startNewCycle(){
+  reanchorCycle(0);
+  lastPostpone=null;lset('lastPostpone',null);
+  setWeek(0,false);
+  renderAutoBox();
+  toast(L().newCycleDone);
 }
 // re-anchor so that the given week index is "this week" by the calendar
 function reanchorCycle(wk){cycleStart=shiftDateStr(todayStr(),-wk*7);lset('cycleStart',cycleStart);}
@@ -1335,6 +1365,13 @@ function renderAutoWeekBanner(){
   var l=L();
   var cw=autoWeek?computedWeek():null;
   if(cw===null){el.style.display='none';return;}
+  if(cycleDone()){
+    el.style.display='block';
+    el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.cycleEndTitle+'</div>'+
+      '<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">'+l.cycleEndSub+'</div>'+
+      '<button class="gbtn" style="margin-top:0;padding:9px 6px;font-size:12.5px;" onclick="startNewCycle()">'+l.btnNewCycle+'</button>';
+    return;
+  }
   if(cw<curWeek){
     var dr=curWeek-cw;
     el.style.display='block';
