@@ -46,6 +46,10 @@ body{display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
 .vol-bar-track{height:6px;background:var(--sf);border-radius:3px;overflow:hidden;}
 .vol-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
 .vol-status{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;}
+.pril-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--bd);}
+.pril-row:last-child{border-bottom:none;}
+.pril-name{font-size:12px;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pril-num{font-size:12px;color:var(--tx2);white-space:nowrap;}
 .exn{font-size:15px;font-weight:600;color:var(--tx);margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .exd{font-size:11px;color:var(--b);margin-bottom:6px;font-style:italic;}
 .exm{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
@@ -143,6 +147,7 @@ select.pinp{appearance:none;}
 .tiphl{outline:2px solid var(--g);outline-offset:2px;border-radius:8px;}
 .adjb-sm{width:28px!important;height:28px!important;font-size:15px!important;padding:0!important;flex-shrink:0;border:.5px solid var(--bd2)!important;background:var(--sf)!important;color:var(--tx)!important;}
 .exm b{color:var(--tx);font-size:13px;}
+.warnbox{background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.65;color:var(--tx);}
 </style>
 </head>
 <body>
@@ -342,6 +347,12 @@ select.pinp{appearance:none;}
       </div>
     </div>
     <div class="card">
+      <div class="ct"><i class="ti ti-wave-sine"></i> <span id="S_WAVE"></span></div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="WAVE_HINT"></div>
+      <div class="ltog" id="WAVE_ROW"></div>
+      <div class="dbox" id="WAVE_BOX" style="margin-top:10px;margin-bottom:0;"></div>
+    </div>
+    <div class="card">
       <div class="ct"><i class="ti ti-flame"></i> <span id="S_HEAVY"></span></div>
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="HEAVY_HINT"></div>
       <div class="ltog" id="HEAVY_ROW"></div>
@@ -356,7 +367,8 @@ select.pinp{appearance:none;}
         <span class="plbl" id="AUTO_START_INPUT_L"></span>
         <input class="pinp" id="AUTO_START_INPUT" type="date" onchange="setCycleStartDate(this.value)">
       </div>
-      <button class="ghostb" id="BTN_FIX_DRIFT" onclick="fixDrift()" style="margin-top:0;"></button>
+      <button class="ghostb" id="BTN_RESYNC_SET" onclick="resyncWeek()" style="margin-top:0;"></button>
+      <button class="ghostb" id="BTN_FIX_DRIFT" onclick="fixDrift()"></button>
       <button class="ghostb" id="BTN_POSTPONE_SET" onclick="postponeWeek()"></button>
       <button class="ghostb" id="BTN_START_TODAY" onclick="startCycleToday()"></button>
     </div>
@@ -372,9 +384,11 @@ select.pinp{appearance:none;}
       <button class="ghostb" id="BTN_IMP" onclick="document.getElementById('IMP_FILE').click()"></button>
       <button class="ghostb" onclick="confirmResetAll()" style="color:var(--r);border-color:rgba(226,75,74,.4);" id="BTN_RESET_ALL"></button>
       <input type="file" id="IMP_FILE" accept=".json" style="display:none;" onchange="importData(event)">
+      <div style="font-size:11px;color:var(--tx2);margin-top:10px;" id="LAST_EXPORT"></div>
     </div>
     <div class="card">
       <div class="ct"><i class="ti ti-device-mobile"></i> <span id="S_INST"></span></div>
+      <div class="warnbox" id="INST_WARN"></div>
       <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:8px;">iPhone (Safari)</div>
       <div class="istep"><div class="inum">1</div><div class="itxt" id="IOS1"></div></div>
       <div class="istep"><div class="inum">2</div><div class="itxt" id="IOS2"></div></div>
@@ -394,16 +408,17 @@ select.pinp{appearance:none;}
   <button class="ni" id="nav-pr" onclick="sw('pr')"><i class="ti ti-settings"></i><span id="N_SET"></span></button>
 </div>
 <div class="toast" id="TOAST"></div>
-
 <script>
 // ============================================================
 // 12-WEEK ROTATION PROGRAM (Prilepin-based)
 // Block1 (W1-4) technique/volume -> W5 deload
 // Block2 (W6-8) intensity -> W9 squat peak -> W10 singles
 // W11 PR attempt week -> W12 recovery & reset
+// Intensity wave (WAVE) rides on top of the block percentages for the
+// classic lifts only, so squats keep their own across-block progression.
 // ============================================================
 var DIRECT_KEYS=['snatch','cleanjerk','squat','frontsquat','press'];
-var DEFAULTS={snatch:80,cleanjerk:105,squat:140,frontsquat:120,press:75};
+var DEFAULTS={snatch:80,cleanjerk:105,squat:140,frontsquat:115,press:80};
 var EX_COLORS={snatch:'#1D9E75',cleanjerk:'#378ADD',squat:'#7F77DD',frontsquat:'#9B59B6',press:'#BA7517',ohs:'#2EA8A8',eccdl:'#D4548A',powersn:'#6FCF97',powercj:'#56B4E0'};
 var EXTRA_PALETTE=['#E67E22','#8E44AD','#16A085','#C0392B','#2C3E50','#27AE60','#D35400','#7F8C8D'];
 function colorFor(key){
@@ -414,18 +429,19 @@ function colorFor(key){
 
 // preset library for user-added exercises (Today screen, ad-hoc)
 // cat:'warm' (session prep, before main) | 'acc' (finisher/hypertrophy, after main)
-// pril: base lift for Prilepin counting (barbell snatch/clean derivatives only)
+// pril: base lift for Prilepin counting (competition-style snatch/clean lifts only)
 var EXTRA_LIB=[
  // ---- 웜업 (본운동 전) ----
  {id:'emptybar',ko:'빈봉 스내치 콤플렉스',en:'Empty-Bar Snatch Complex',cat:'warm',sets:2,reps:5,pril:null,nk:'풀+하이풀+머슬스내치+OHS 연결',ne:'Pull+high pull+muscle snatch+OHS flow'},
- {id:'muscsn',ko:'머슬 스내치',en:'Muscle Snatch',cat:'warm',sets:3,reps:5,pril:'snatch',nk:'가볍게, 팔꿈치 높게 터닝오버 연습',ne:'Light; drill high-elbow turnover'},
+ {id:'muscsn',ko:'머슬 스내치',en:'Muscle Snatch',cat:'warm',sets:3,reps:5,pril:null,nk:'가볍게, 팔꿈치 높게 터닝오버 연습',ne:'Light; drill high-elbow turnover'},
  {id:'bnp',ko:'비하인드 넥 프레스(스내치그립)',en:'Snatch-Grip BN Press',cat:'warm',sets:3,reps:8,pril:null,nk:'어깨·등상부 활성화',ne:'Shoulder/upper-back activation'},
  {id:'gm',ko:'굿모닝',en:'Good Morning',cat:'warm',sets:3,reps:8,pril:null,nk:'햄스트링·등 하부 준비',ne:'Prime hamstrings & lower back'},
  {id:'boxjump',ko:'박스 점프',en:'Box Jump',cat:'warm',sets:3,reps:3,pril:null,nk:'CNS 활성화, 최대 높이 아님',ne:'CNS priming, not max height'},
  {id:'sotts',ko:'솟츠 프레스',en:'Sotts Press',cat:'warm',sets:2,reps:5,pril:null,nk:'바닥 자세 오버헤드 가동성',ne:'Overhead mobility in the bottom'},
  // ---- 보조·마무리 (본운동 후) ----
  {id:'jumpsq',ko:'점프 스쿼트',en:'Jump Squat',cat:'acc',sets:4,reps:5,pril:null,nk:'가벼운 중량(체중~25%)으로 폭발력',ne:'Light load (~25% BW) for power'},
- {id:'pindl',ko:'핀 데드리프트(무릎 위)',en:'Pin Deadlift (above knee)',cat:'acc',sets:3,reps:3,pril:'cleanjerk',nk:'무릎 위 랙에서 시작, 과부하 풀',ne:'Start from pins above knee; overload pull'},
+ {id:'rackjerk',ko:'랙 저크',en:'Rack Jerk',cat:'acc',sets:3,reps:2,pril:null,nk:'클린 없이 저크만 — 락아웃 안정성',ne:'Jerk only, no clean - lockout stability'},
+ {id:'pindl',ko:'핀 데드리프트(무릎 위)',en:'Pin Deadlift (above knee)',cat:'acc',sets:3,reps:3,pril:null,nk:'무릎 위 랙에서 시작, 과부하 풀',ne:'Start from pins above knee; overload pull'},
  {id:'pinsq',ko:'핀 스쿼트',en:'Pin Squat',cat:'acc',sets:3,reps:3,pril:null,nk:'바닥 정지 구간 스트렝스',ne:'Dead-stop strength out of the hole'},
  {id:'hrsq',ko:'고반복 백 스쿼트',en:'High-Rep Back Squat',cat:'acc',sets:2,reps:18,pril:null,nk:'가벼운 중량 18~20회, 세트간 60~90초',ne:'Light, 18-20 reps, 60-90s rest'},
  {id:'row',ko:'바벨 로우',en:'Barbell Row',cat:'acc',sets:4,reps:8,pril:null,nk:'풀 균형용 등 두께',ne:'Back thickness to balance pulling'},
@@ -485,9 +501,10 @@ var B2=[
    E('스내치','Snatch','snatch',.80,'2',6,180,'lift','snatch'),
    E('스내치 풀','Snatch Pull','snatch',.90,'2',4,150,'pull'),
    E('백 스쿼트','Back Squat','squat',.85,'3',4,210,'squat','squat')]},
- {sk:'용상 강도 상향',se:'C&J intensity up',ex:[
+ {sk:'용상 강도 상향 & 저크',se:'C&J intensity up & jerk',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.85,'1+1',5,180,'lift','cleanjerk'),
    E('클린 풀','Clean Pull','cleanjerk',1.00,'2',3,180,'pull',null,'무겁게 뽑는 연습','Heavy pulling practice'),
+   E('랙 저크','Rack Jerk','cleanjerk',.85,'2',3,180,'rackjerk',null,'클린 없이 저크만 — 락아웃 전용','Jerk only from the rack - lockout work'),
    E('푸시 프레스','Push Press','press',.80,'3',4,210,'press','press')]},
  {sk:'포지션 스내치 & 프론트',se:'Position snatch & front squat',ex:[
    E('스내치','Snatch','snatch',.75,'3',5,150,'lift','snatch','강해진 포지션으로 바닥에서 정식 수행','Full lift from the floor with the improved position'),
@@ -503,9 +520,10 @@ var W9=[
    E('스내치','Snatch','snatch',.80,'2',5,180,'lift','snatch'),
    E('스내치 풀','Snatch Pull','snatch',.90,'2',3,150,'pull'),
    E('백 스쿼트','Back Squat','squat',.90,'2',3,240,'squat','squat','스쿼트 최고 중량 주간','Squat peak week')]},
- {sk:'용상 유지',se:'C&J maintain',ex:[
+ {sk:'용상 유지 & 저크',se:'C&J maintain & jerk',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.80,'1+1',4,180,'lift','cleanjerk'),
    E('클린 풀','Clean Pull','cleanjerk',.95,'2',3,180,'pull'),
+   E('랙 저크','Rack Jerk','cleanjerk',.875,'2',3,180,'rackjerk'),
    E('푸시 프레스','Push Press','press',.75,'2',3,180,'press','press')]},
  {sk:'프론트 스쿼트 피크',se:'Front squat peak',ex:[
    E('스내치','Snatch','snatch',.75,'2',4,150,'lift'),
@@ -524,6 +542,7 @@ var W10=[
  {sk:'C&J 싱글 적응',se:'C&J heavy singles',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.90,'1+1',4,240,'lift','cleanjerk','90% 싱글 적응','Adapt to 90% singles'),
    E('클린 풀','Clean Pull','cleanjerk',.90,'1',3,150,'pull'),
+   E('랙 저크','Rack Jerk','cleanjerk',.90,'1',2,210,'rackjerk',null,'싱글로 락아웃 확인','Singles to confirm lockout'),
    E('푸시 프레스','Push Press','press',.70,'2',3,150,'press','press')]},
  {sk:'가볍게 유지',se:'Light maintain',ex:[
    E('스내치','Snatch','snatch',.80,'1',5,180,'lift'),
@@ -559,20 +578,25 @@ var W12=[
    E('파워 클린','Power Clean','cleanjerk',.55,'2',3,120,'power','powercj',null,'새 PR을 설정 탭에 저장하고 1주차부터 재시작','Save new PRs in Settings, then restart at Week 1')]}
 ];
 
-var NOTE_B1_K='블록 1 (1~4주) — 무릎 위 약점을 인지하고, 프릴레핀 최적 볼륨으로 바벨 스피드를 극대화하는 기술 축적 구간. 자세가 무너지면 그 세트는 즉시 종료하세요.';
-var NOTE_B1_E='Block 1 (W1-4) — technique accumulation. Fix the above-knee weakness and maximize bar speed at Prilepin-optimal volume. End the set the moment technique breaks.';
+// Intensity wave, applied to the classic lifts only (base snatch / cleanjerk).
+// Block 1: 3 weeks up, 4th slightly unloaded into the week-5 deload.
+// Block 2: 3 weeks up into the week-9 squat peak. Peak/PR weeks carry no wave.
+var WAVE=[0,.025,.05,.025,0,0,.025,.05,0,0,0,0];
+
+var NOTE_B1_K='블록 1 (1~4주) — 무릎 위 약점을 인지하고, 프릴레핀 최적 볼륨으로 바벨 스피드를 극대화하는 기술 축적 구간. 주종목 강도는 1→3주 상승, 4주는 디로딩 직전 소폭 언로딩. 자세가 무너지면 그 세트는 즉시 종료하세요.';
+var NOTE_B1_E='Block 1 (W1-4) - technique accumulation. Fix the above-knee weakness and maximize bar speed at Prilepin-optimal volume. Classic-lift intensity rises W1-3 and unloads slightly in W4 before the deload. End the set the moment technique breaks.';
 var NOTE_DL_K='디로딩 주간 — CNS와 관절을 회복하는 주간입니다. 쉬는 주가 아니라 60~70%로 가볍게 움직여 몸을 리셋하는 주입니다.';
-var NOTE_DL_E='Deload week — reset the CNS and joints. Not a week off: move light at 60-70%.';
-var NOTE_B2_K='블록 2 (6~8주) — 강도를 5%p 상향해 실전 중량 적응력을 높이는 구간. 바벨 속도가 급격히 느려지는 중량은 피하세요.';
-var NOTE_B2_E='Block 2 (W6-8) — intensity up 5%p to build heavy-weight tolerance. Avoid loads where bar speed collapses.';
+var NOTE_DL_E='Deload week - reset the CNS and joints. Not a week off: move light at 60-70%.';
+var NOTE_B2_K='블록 2 (6~8주) — 강도를 5%p 상향하고 주 단위로 다시 파동을 태워 실전 중량 적응력을 높이는 구간. 랙 저크로 저크 락아웃을 따로 쌓습니다. 바벨 속도가 급격히 느려지는 중량은 피하세요.';
+var NOTE_B2_E='Block 2 (W6-8) - intensity up 5%p with a weekly wave on top, building heavy-weight tolerance. Rack jerks add dedicated lockout work. Avoid loads where bar speed collapses.';
 var NOTE_W9_K='9주 — 스쿼트 피크. 백/프론트 스쿼트를 사이클 최고 중량으로 올립니다. 세트 사이 3~4분 충분히 쉬세요.';
-var NOTE_W9_E='W9 — squat peak. Back/front squat at cycle-max loads. Rest a full 3-4 minutes.';
+var NOTE_W9_E='W9 - squat peak. Back/front squat at cycle-max loads. Rest a full 3-4 minutes.';
 var NOTE_W10_K='10주 — 싱글 적응. 메인 리프트 90% 싱글로 무거운 무게 감각을 만듭니다. 세트당 1회, 완벽한 자세로.';
-var NOTE_W10_E='W10 — heavy singles. Build feel for 90% loads. One perfect rep per set.';
+var NOTE_W10_E='W10 - heavy singles. Build feel for 90% loads. One perfect rep per set.';
 var NOTE_W11_K='11주 — 기록 도전 주간 🏆 90% → 95% → 신기록 순서로 시도하세요. 성공하면 그래프 탭에 새 기록을 입력하면 PR이 자동 갱신됩니다.';
-var NOTE_W11_E='W11 — PR week 🏆 Attempt 90% then 95% then a new record. Log a successful lift in the Graph tab and your PR updates automatically.';
+var NOTE_W11_E='W11 - PR week 🏆 Attempt 90% then 95% then a new record. Log a successful lift in the Graph tab and your PR updates automatically.';
 var NOTE_W12_K='12주 — 회복 & 리셋. 사이클 종료 후 설정 탭에서 새 PR을 저장하고 1주차부터 새 사이클을 시작하세요.';
-var NOTE_W12_E='W12 — recovery & reset. Save your new PRs in Settings and restart the cycle at Week 1.';
+var NOTE_W12_E='W12 - recovery & reset. Save your new PRs in Settings and restart the cycle at Week 1.';
 
 var WEEKS=[
  {lk:'1주 · 기술',le:'W1 Tech',nk:NOTE_B1_K,ne:NOTE_B1_E,days:B1},
@@ -604,7 +628,7 @@ var TIPS=[
     de:'Hold your back angle through the first pull, drive the floor away with the quads, make contact above the knee, then a violent triple extension and fast turnover. If the chest rises early, the hips bang the bar forward. <b>End the set the moment technique breaks.</b>'},
    {id:'pull',tk:'스내치 풀 / 클린 풀',te:'Snatch Pull / Clean Pull',
     dk:'<b>슈러그까지 포함</b>하는 것이 정석입니다. 단, 헬스장 슈러그처럼 위로 으쓱하는 게 아니라 <b>뒤(Back)로</b> — 하체 폭발 직후 광배와 상체 후면으로 바벨을 몸쪽에 바짝 밀착시키는 슈러그입니다. 일반 데드리프트처럼 엉덩이부터 들지 말고, 반드시 역도 출발 자세와 똑같은 궤적으로 수행하세요.',
-    de:'The shrug is part of the movement — but shrug <b>back</b>, not up. Right after leg drive, use the lats and upper back to keep the bar glued to the body. Never pull it like a conventional deadlift: keep the exact same start position and bar path as your competition lift.'},
+    de:'The shrug is part of the movement - but shrug <b>back</b>, not up. Right after leg drive, use the lats and upper back to keep the bar glued to the body. Never pull it like a conventional deadlift: keep the exact same start position and bar path as your competition lift.'},
    {id:'segpull',tk:'세그먼트 스내치 풀 (무릎 위 3초 정지)',te:'Segment Snatch Pull (3s pause above knee)',
     dk:'바닥에서 뽑아 <b>무릎 바로 위에서 3초 정지</b>합니다. 이때 체중은 발바닥 전체~뒤꿈치, 어깨는 바벨보다 살짝 앞, 겨드랑이는 바벨을 허벅지 쪽으로 당기는 상태를 유지하며 온몸으로 버팁니다. 3초 후 그 텐션 그대로 폭발적으로 가속해 슈러그로 마무리. <b>무릎 위 유지력을 교정하는 핵심 운동</b>입니다.',
     de:'Pull from the floor and <b>pause 3 seconds just above the knee</b>: weight mid-foot to heel, shoulders slightly over the bar, lats pulling the bar into the thigh. After 3s, accelerate explosively and finish with the shrug. This is the key fix for your above-knee weakness.'},
@@ -614,9 +638,12 @@ var TIPS=[
    {id:'balance',tk:'스내치 밸런스',te:'Snatch Balance',
     dk:'드롭 스피드와 오버헤드 받는 자세의 안정성을 훈련합니다. 발을 빠르고 가볍게 옮기고, 바벨 아래로 <b>몸이 먼저 내려가는</b> 감각에 집중하세요.',
     de:'Trains drop speed and overhead stability. Move the feet fast and light, and focus on driving your body under the bar.'},
+   {id:'rackjerk',tk:'랙 저크',te:'Rack Jerk',
+    dk:'랙에서 바벨을 받아 <b>클린 없이 저크만</b> 수행합니다. C&J에서는 클린 피로 때문에 저크를 충분히 연습할 수 없는데, 이 운동이 그 공백을 메웁니다. 딥은 짧고 수직으로, 발은 빠르게 스플릿, <b>앞발 정강이는 수직·뒷무릎은 살짝 굽힘</b>, 바벨은 귀 뒤에서 락아웃합니다. 락아웃이 흔들리면 그 세트에서 중량을 올리지 마세요.',
+    de:'Take the bar from the rack and <b>jerk only, no clean</b>. In the full C&J, clean fatigue limits jerk practice; this fills that gap. Short vertical dip, fast split, front shin vertical, back knee slightly bent, and lock the bar behind the ears. If the lockout wavers, do not add weight on that set.'},
    {id:'jerkdrive',tk:'저크 드라이브',te:'Jerk Drive',
     dk:'C&J 95% 수준의 무거운 중량으로 <b>딥 & 드라이브만</b> 수행합니다. 락아웃 없이, 무거운 무게를 하체 반동으로 받아 튕겨 올리는 감각을 익히는 훈련입니다. 딥은 짧고 수직으로.',
-    de:'Dip and drive only, at ~95% of your C&J — no lockout. Builds the leg-drive feel for heavy weights. Keep the dip short and vertical.'},
+    de:'Dip and drive only, at ~95% of your C&J - no lockout. Builds the leg-drive feel for heavy weights. Keep the dip short and vertical.'},
    {id:'eccdl',tk:'익센트릭 역도 데드리프트',te:'Eccentric WL Deadlift',
     dk:'역도 자세로 뽑아 일어선 후, 내려갈 때 <b>무릎 위 구간에서만 4~5초 극도로 천천히</b> 바벨을 허벅지에 쓸면서 하강합니다. 바벨이 몸에서 멀어지려는 원심력을 등(광배)으로 버텨내는 네거티브 훈련으로, 무릎 위 유지력이 비약적으로 좋아집니다.',
     de:'Stand up with weightlifting start mechanics, then lower <b>4-5 seconds through the above-knee zone only</b>, sweeping the bar down the thigh. The negative teaches the lats to resist the bar drifting away.'},
@@ -634,7 +661,7 @@ var TIPS=[
     de:'Short vertical dip, drive with the legs, press to lockout. Builds jerk drive power and overhead strength.'},
    {id:'prday',tk:'🏆 기록 도전일 진행법',te:'🏆 PR attempt day',
     dk:'충분히 워밍업 후 <b>90% × 1회 → 95% × 1회 → 신기록 시도</b> 순서로 진행합니다. 시도 사이 3~4분 이상 쉬고, 실패해도 최대 1회만 재시도하세요. 성공하면 <b>그래프 탭에 새 기록을 입력</b>하면 PR이 자동 갱신되고, 다음 사이클 중량이 새 기준으로 계산됩니다.',
-    de:'After a full warm-up: 90% x1, then 95% x1, then a new-record attempt. Rest 3-4+ minutes between attempts; retry a miss once at most. Log a successful lift in the Graph tab — the PR updates automatically and the next cycle recalculates from it.'}
+    de:'After a full warm-up: 90% x1, then 95% x1, then a new-record attempt. Rest 3-4+ minutes between attempts; retry a miss once at most. Log a successful lift in the Graph tab - the PR updates automatically and the next cycle recalculates from it.'}
  ]},
  {icon:'ti-clock',tk:'세트 사이 휴식 시간',te:'Rest between sets',items:[
    {id:null,tk:'역도 기술 동작 (스내치, C&J, 풀 계열)',te:'Technical lifts (snatch, C&J, pulls)',
@@ -648,21 +675,29 @@ var TIPS=[
     de:'<b>1 to 1.5 min.</b>'}
  ]},
  {icon:'ti-list-check',tk:'프로그램 진행 규칙',te:'Program rules',items:[
+   {id:'wave',tk:'주차별 강도 파동',te:'Weekly intensity wave',
+    dk:'같은 블록 안에서도 주종목(스내치·C&J 계열) 강도가 주마다 <b>0 → +2.5% → +5% → +2.5%</b>로 움직입니다. 4주 내내 같은 중량을 반복하면 적응이 멈추기 때문입니다. 스쿼트·프레스에는 파동을 걸지 않습니다 — 스쿼트는 블록을 넘어가며 이미 80 → 85 → 90 → 95%로 올라가기 때문입니다. 설정 탭에서 끄면 원래의 고정 강도로 돌아갑니다.',
+    de:'Inside a block the classic lifts (snatch / C&J family) move <b>0 → +2.5% → +5% → +2.5%</b> week to week, because repeating one load for four weeks stalls adaptation. Squats and presses get no wave - they already climb 80 → 85 → 90 → 95% across blocks. Turn it off in Settings to run the original flat percentages.'},
    {id:null,tk:'자세가 무너지면 즉시 중단',te:'Stop when technique breaks',
     dk:'프릴레핀 차트는 완벽한 자세를 전제로 합니다. 피로로 자세가 흔들리면 반복수를 줄이거나 중량을 낮추세요. 3세트째부터 자세가 깨진다면 다음 주 중량을 2~3kg 낮춥니다.',
     de:'Prilepin assumes perfect technique. If form degrades from fatigue, cut reps or load. If it breaks by set 3, drop 2-3kg next week.'},
+   {id:null,tk:'프릴레핀은 종목별로 센다',te:'Prilepin counts per exercise',
+    dk:'프릴레핀 차트의 총 반복수는 <b>한 종목 기준</b>입니다. 그래서 이 앱도 스내치·C&J 같은 경기 종목을 <b>각각 따로</b> 판정합니다. 풀·저크드라이브·랙저크·OHS 같은 보조 동작과 스쿼트는 1RM 기준 자체가 달라서 제외되고, 고강도 싱글 보강도 의도적인 소량 자극이라 집계하지 않습니다.',
+    de:'Prilepin totals are <b>per exercise</b>, so the app judges each competition lift on its own. Pulls, jerk drives, rack jerks, OHS and squats sit on a different 1RM basis and are excluded, as are the heavy-single primers.'},
    {id:null,tk:'억지 1RM 측정 금지',te:'No forced monthly maxes',
     dk:'매달 1RM을 억지로 재면 CNS가 고갈되어 슬럼프가 옵니다. 이 프로그램은 8주간 볼륨과 스피드를 쌓고 <b>11주차에 자연스럽게 기록을 경신</b>하도록 설계되어 있습니다.',
     de:'Forcing a max every month drains the CNS. This program builds volume and speed for 8 weeks so the record comes naturally in Week 11.'},
    {id:null,tk:'훈련 기록은 매 세션 저장',te:'Save every session to the graph',
     dk:'오늘 탭에서 세트를 완료하고 <b>[훈련 기록 그래프로 저장]</b> 버튼을 누르면 그날의 작업 중량이 그래프에 쌓입니다. 주가 지날수록 상승하는 곡선으로 향상도를 확인하세요.',
     de:'After finishing your sets, tap <b>Save session to graph</b> in the Today tab. Your working weights accumulate on the chart so you can watch the trend rise week by week.'},
+   {id:null,tk:'iOS는 홈 화면에 설치해야 기록이 남습니다',te:'On iOS, install to the home screen',
+    dk:'Safari는 7일간 사이트 방문이 없으면 저장된 데이터를 자동으로 지웁니다. <b>홈 화면에 추가한 웹 앱만 이 삭제 대상에서 제외</b>됩니다. 설정 탭 맨 아래 설치 방법을 따르고, 주 1회 JSON 백업도 함께 해두세요.',
+    de:'Safari deletes stored site data after 7 days without a visit. <b>Only home-screen web apps are exempt.</b> Follow the install steps at the bottom of Settings, and export a JSON backup weekly.'},
    {id:null,tk:'12주 후 리셋',te:'Reset after Week 12',
     dk:'사이클 종료 후 설정 탭에 새 PR을 저장하면 모든 % 중량이 새 기준으로 재계산됩니다. 그 후 1주차부터 새 사이클을 시작하세요.',
-    de:'After the cycle, save your new PRs in Settings — every percentage recalculates. Then restart at Week 1.'}
+    de:'After the cycle, save your new PRs in Settings - every percentage recalculates. Then restart at Week 1.'}
  ]}
 ];
-
 // ===== TRANSLATIONS =====
 var LNG={
  ko:{appTitle:'역도 트레이너',nextWeek:'다음 주',todayBtn:'오늘',
@@ -677,9 +712,15 @@ var LNG={
   levelTitle:'PR·체중 기반 레벨 분석',lvlLabel:'추정 레벨',recTier:'추천 볼륨 티어',applyTier:'추천 티어 적용하기',
   ratioCJ:'C&J / 체중',ratioSnatch:'스내치 / 체중',bmiLabel:'BMI',sinclairLabel:'Sinclair (참고)',
   lvlNames:{entry:'입문',novice:'초중급',inter:'중상급',semipro:'준프로급',national:'국가대표급'},
-  levelFoot:'레벨은 Sinclair 점수 구간(공개 벤치마크: Local 300 / Regional 350 / National 400 / International 450+)으로 추정해요. 계수는 IWF 2017–2020 공식 발표값이며, 여성 구간은 남성의 약 65% 근사치라 공식 수치는 아니에요. 참고용으로만 활용해주세요.',
+  levelFoot:'레벨은 Sinclair 점수 구간(공개 벤치마크: Local 300 / Regional 350 / National 400 / International 450+)으로 추정해요. 계수는 IWF가 공표한 2021–2024 주기 값(남 A=0.722762521·b=193.609kg, 여 A=0.787004341·b=153.757kg)을 사용합니다. 여성 구간은 남성의 약 65% 근사치라 공식 수치는 아니에요. 참고용으로만 활용해주세요.',
   dwkAssumed:'미기록',
   prWeekEta:'🏆 11주차(기록 도전) 예상 기간: {a} ~ {b}',
+  sWave:'주차별 강도 파동',
+  waveHint:'같은 블록을 4주 내내 같은 중량으로 반복하면 적응이 멈춥니다. 켜면 주종목(스내치·C&J 계열)만 주마다 0 → +2.5% → +5% → +2.5%로 움직이고, 스쿼트·프레스는 블록 간 진행 그대로 둡니다.',
+  waveNames:{on:'사용',off:'미사용'},
+  waveOffMsg:'미사용 중 — 블록별 고정 강도로 진행합니다.',
+  waveWeeksL:'파동 적용 주차',waveScopeL:'적용 범위',waveScopeV:'주종목(스내치·C&J 계열)만',
+  waveCurL:'이번 주 보정',waveNone:'없음',
   sHeavy:'고강도 싱글 보강',
   heavyHint:'이 프로그램은 10주차 전까지 90% 이상을 잡지 않아요. 켜면 3·6·8주차 Day1(스내치)·Day2(C&J)에 90% 싱글 2세트가 추가돼, 볼륨은 거의 그대로 두고 무거운 무게 감각만 유지합니다.',
   heavyNames:{on:'사용',off:'미사용'},
@@ -703,11 +744,16 @@ var LNG={
   storeMsg:'브라우저가 이 사이트의 저장소를 막고 있어서, 진행 주차와 기록이 앱을 닫으면 사라집니다. 시크릿/프라이빗 모드를 끄거나, 브라우저 설정에서 이 사이트의 쿠키·사이트 데이터 허용을 확인해 주세요. 저장 공간이 가득 찬 경우에도 발생할 수 있어요.',
   postponeWait:'⏳ 미루기 완료 — {n}일 후 다시 가능',
   autoStartInputL:'시작일 직접 지정',
-  driftL:'밀린 정도',driftVal:'{n}주',
-  driftTitle:'⚠️ 미루기가 누적돼 있어요',
-  driftSub:'미루기가 {n}주 쌓여서 날짜와 진행 주차가 어긋났어요. 지금 진행 중인 {w}를 이번 주로 맞추면 다음 주부터 원래 순서대로 이어집니다.',
-  btnFixDrift:'🔧 미루기 되돌리기 — 이번 주에 맞추기',
-  driftFixed:'이번 주 기준으로 복구했어요',
+  driftL:'차이',driftVal:'{n}주',
+  resyncTitle:'📅 날짜와 보고 있는 주차가 달라요',
+  resyncSub:'날짜 기준으로는 {c}인데 화면은 {w}를 보고 있어요. 열람만 한 거라면 되돌리고, 실제로 {w}를 진행 중이라면 시작일을 지금 주에 맞추세요.',
+  btnResync:'📅 {c}로 돌아가기',
+  btnAnchorHere:'🔧 시작일을 {w}에 맞추기',
+  btnFixDrift:'🔧 시작일을 현재 주차에 맞추기',
+  driftFixed:'시작일을 현재 주차에 맞췄어요',
+  resynced:'날짜 기준 주차로 돌아왔어요 — {w}',
+  goTodayNoCycle:'사이클 시작일을 설정하면 주차까지 함께 복구돼요',
+  goTodayDone:'오늘 기준으로 맞췄어요 — {w}',
   cycleEndTitle:'🎉 12주 사이클을 완주했어요',
   cycleEndSub:'사이클 마지막 주가 지났습니다. 새 PR을 설정 탭에 저장한 뒤 새 사이클을 시작하면, 모든 중량이 새 기준으로 다시 계산돼요.',
   btnNewCycle:'🔄 이번 주부터 새 사이클 시작 (1주차)',
@@ -718,10 +764,13 @@ var LNG={
   sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
   dowNames:['일','월','화','수','목','금','토'],
   sData:'데이터 관리',btnExp:'JSON으로 내보내기',btnImp:'JSON 불러오기',btnResetAll:'전체 세트 초기화',
+  lastExportL:'마지막 백업',neverExported:'아직 없음 — 주 1회 백업을 권장해요',
   sInst:'홈 화면 설치',
+  instWarn:'⚠️ iOS Safari는 7일 동안 이 사이트를 열지 않으면 저장된 훈련 기록을 자동으로 지웁니다. <b>홈 화면에 추가한 웹 앱만 이 삭제에서 제외</b>되므로, 반드시 아래 방법으로 설치해서 사용하세요. 추가로 주 1회 [JSON으로 내보내기]로 백업해 두면 안전합니다.',
   ios1:'Safari로 GitHub Pages URL 열기',ios2:'하단 공유 버튼 → 홈 화면에 추가',
   and1:'Chrome으로 GitHub Pages URL 열기',and2:'점 3개 메뉴 → Share → Add to Home screen',
   tNext:'다음 세트까지 남은 시간',tAdj:'15초 조절',tOpen:'휴식 타이머 열기',tStart:'Start',tPause:'Pause',
+  tDone:'⏱ 휴식 끝 — 다음 세트',
   gAdd:'기록 추가 (PR 갱신)',gExL:'종목',gWtL:'중량 (kg)',gDtL:'날짜',btnLog:'기록 추가',
   gHist:'최근 기록',noRec:'기록이 없습니다.',gNote:'📈 진한 점: 훈련 작업중량(자동 저장) 및 수동 입력 기록. 새 기록 입력 시 PR이 자동 갱신됩니다.',
   restDay:'휴식일',doneSets:'완료',remaining:'미완료',successRate:'성공률',
@@ -733,6 +782,10 @@ var LNG={
   drvTitle:'파생 중량 자동 계산 (현재 입력값 기준)',
   btnSaveDay:'📈 훈련 기록 그래프로 저장',savedDay:'개 종목 기록 저장됨',savedNone:'완료(초록) 표시된 세트가 없어요',
   trainTag:'훈련',prTag:'PR',
+  prilTitle:'Prilepin 종목별 점검',
+  prilNone:'오늘은 Prilepin 집계 대상 종목이 없어요 (풀·보조·회복일)',
+  prilFoot:'프릴레핀 총 반복수는 종목별 기준이라 경기 종목만 따로 셉니다. 풀·저크드라이브·랙저크·OHS·스쿼트와 고강도 싱글 보강은 제외.',
+  stOk:'적정',stLow:'부족',stHigh:'과잉',stPlanned:'계획된 감량',
   exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스',ohs:'오버헤드 스쿼트',eccdl:'익센트릭 DL',powersn:'파워 스내치',powercj:'파워 클린(+저크)'},
   logOpts:[{v:'snatch',l:'스내치'},{v:'cleanjerk',l:'클린&저크'},{v:'squat',l:'백 스쿼트'},{v:'frontsquat',l:'프론트 스쿼트'},{v:'press',l:'푸시 프레스'}],
   gFilters:[{k:'all',l:'전체'},{k:'snatch',l:'스내치'},{k:'cleanjerk',l:'클린&저크'},{k:'squat',l:'백스쿼트'},{k:'frontsquat',l:'프론트'},{k:'press',l:'푸시프레스'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'익센트릭DL'},{k:'powersn',l:'파워스내치'},{k:'powercj',l:'파워클린'}],
@@ -755,9 +808,15 @@ var LNG={
   levelTitle:'Level from PR & bodyweight',lvlLabel:'Est. level',recTier:'Recommended tier',applyTier:'Apply recommended tier',
   ratioCJ:'C&J / BW',ratioSnatch:'Snatch / BW',bmiLabel:'BMI',sinclairLabel:'Sinclair (approx.)',
   lvlNames:{entry:'Entry',novice:'Novice',inter:'Intermediate',semipro:'Semi-pro',national:'National'},
-  levelFoot:'Level is estimated from Sinclair score bands (public benchmarks: Local 300 / Regional 350 / National 400 / International 450+). Coefficients are IWF\'s official 2017-2020 values; female bands are an unofficial ~65%-of-male approximation. Reference only.',
+  levelFoot:'Level is estimated from Sinclair score bands (public benchmarks: Local 300 / Regional 350 / National 400 / International 450+). Coefficients are the IWF 2021-2024 cycle values (men A=0.722762521, b=193.609kg; women A=0.787004341, b=153.757kg). Female bands are an unofficial ~65%-of-male approximation. Reference only.',
   dwkAssumed:'not recorded',
   prWeekEta:'🏆 Week 11 (PR week) projected: {a} ~ {b}',
+  sWave:'Weekly intensity wave',
+  waveHint:'Repeating one load for four weeks stalls adaptation. When on, only the classic lifts (snatch / C&J family) move 0 → +2.5% → +5% → +2.5% week to week; squats and presses keep their across-block progression.',
+  waveNames:{on:'On',off:'Off'},
+  waveOffMsg:'Off - running flat block percentages.',
+  waveWeeksL:'Waved weeks',waveScopeL:'Scope',waveScopeV:'Classic lifts only (snatch / C&J)',
+  waveCurL:'This week',waveNone:'none',
   sHeavy:'Heavy-single primers',
   heavyHint:'The base program never goes above 85% before week 10. Turning this on adds 2x1 @90% on weeks 3, 6 and 8 (Day1 snatch, Day2 C&J) - almost no extra volume, but keeps you familiar with heavy loads.',
   heavyNames:{on:'On',off:'Off'},
@@ -781,11 +840,16 @@ var LNG={
   storeMsg:'Your browser is blocking storage for this site, so your week and records disappear when the app closes. Turn off private/incognito mode, or allow cookies and site data for this site. A full storage quota can cause this too.',
   postponeWait:'\u23f3 Postponed - available again in {n}d',
   autoStartInputL:'Set start date',
-  driftL:'Drift',driftVal:'{n} wk',
-  driftTitle:'\u26a0\ufe0f Postpones have piled up',
-  driftSub:'{n} week(s) of postponing put the calendar out of sync. Align your current {w} to this week and the schedule resumes in order from next week.',
-  btnFixDrift:'\ud83d\udd27 Undo postpones - align to this week',
-  driftFixed:'Realigned to this week',
+  driftL:'Difference',driftVal:'{n} wk',
+  resyncTitle:'\ud83d\udcc5 The week on screen does not match the date',
+  resyncSub:'By the calendar you are in {c}, but the screen shows {w}. If you were only browsing, jump back; if you really are running {w}, move the start date to this week.',
+  btnResync:'\ud83d\udcc5 Back to {c}',
+  btnAnchorHere:'\ud83d\udd27 Move start date to {w}',
+  btnFixDrift:'\ud83d\udd27 Move start date to the current week',
+  driftFixed:'Start date aligned to the current week',
+  resynced:'Back to the calendar week - {w}',
+  goTodayNoCycle:'Set a cycle start date and the week will be restored too',
+  goTodayDone:'Aligned to today - {w}',
   cycleEndTitle:'\ud83c\udf89 You finished the 12-week cycle',
   cycleEndSub:'The final week has passed. Save your new PRs in Settings, then start a new cycle - every load recalculates from the new maxes.',
   btnNewCycle:'\ud83d\udd04 Start a new cycle this week (Week 1)',
@@ -796,10 +860,13 @@ var LNG={
   sDow:'Training days (max 4)',btnSaveDow:'Save days',
   dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
   sData:'Data',btnExp:'Export JSON',btnImp:'Import JSON',btnResetAll:'Reset all sets',
+  lastExportL:'Last backup',neverExported:'never - weekly backups recommended',
   sInst:'Install to home screen',
+  instWarn:'\u26a0\ufe0f Safari on iOS deletes stored site data after 7 days without opening this site. <b>Only home-screen web apps are exempt</b>, so install it using the steps below. Exporting a JSON backup once a week is a good second line of defence.',
   ios1:'Open GitHub Pages URL in Safari',ios2:'Share button → Add to Home Screen',
   and1:'Open GitHub Pages URL in Chrome',and2:'3-dot menu → Share → Add to Home screen',
   tNext:'Time until next set',tAdj:'±15s',tOpen:'Rest timer',tStart:'Start',tPause:'Pause',
+  tDone:'\u23f1 Rest over - next set',
   gAdd:'Add record (updates PR)',gExL:'Exercise',gWtL:'Weight (kg)',gDtL:'Date',btnLog:'Add',
   gHist:'Recent records',noRec:'No records yet.',gNote:'📈 Points include auto-saved training weights and manual entries. A new record updates your PR automatically.',
   restDay:'Rest day',doneSets:'Done',remaining:'Remaining',successRate:'Success',
@@ -811,6 +878,10 @@ var LNG={
   drvTitle:'Derived weights (from current inputs)',
   btnSaveDay:'📈 Save session to graph',savedDay:'lifts saved',savedNone:'No sets marked done (green) yet',
   trainTag:'train',prTag:'PR',
+  prilTitle:'Prilepin check, per exercise',
+  prilNone:'No Prilepin-counted lifts today (pull / accessory / recovery day)',
+  prilFoot:'Prilepin totals are per exercise, so only competition lifts are counted. Pulls, jerk drives, rack jerks, OHS, squats and heavy-single primers are excluded.',
+  stOk:'OK',stLow:'Low',stHigh:'High',stPlanned:'planned',
   exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press',ohs:'Overhead Squat',eccdl:'Eccentric DL',powersn:'Power Snatch',powercj:'Power Clean(+Jerk)'},
   logOpts:[{v:'snatch',l:'Snatch'},{v:'cleanjerk',l:'Clean & Jerk'},{v:'squat',l:'Back Squat'},{v:'frontsquat',l:'Front Squat'},{v:'press',l:'Push Press'}],
   gFilters:[{k:'all',l:'All'},{k:'snatch',l:'Snatch'},{k:'cleanjerk',l:'C&J'},{k:'squat',l:'Back Sq'},{k:'frontsquat',l:'Front Sq'},{k:'press',l:'Press'},{k:'ohs',l:'OHS'},{k:'eccdl',l:'Ecc DL'},{k:'powersn',l:'Pwr Snatch'},{k:'powercj',l:'Pwr Clean'}],
@@ -853,18 +924,19 @@ function checkStorage(){
 
 var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
 // dweek: { 'YYYY-MM-DD': weekIdx } - which program week a given date was trained under.
-// Stamped once, on the first time anything is recorded for that date, and never overwritten,
-// so editing an old session later can't rewrite its history.
+// dtier: { 'YYYY-MM-DD': volTier } - the volume tier in force that day, so changing tiers later
+// cannot rewrite how many sets a past session was supposed to have.
 var dweek=lget('dweek',{});
+var dtier=lget('dtier',{});
 var curWeek=Math.min(lget('week',0),11);
-// Auto week advance (opt-in): cycleStart is the date Week 1 began. The date-derived week is only
-// ever a *suggestion* shown as a banner - the user confirms, or postpones a week they had to miss.
-// Training progress follows what you actually did, not the calendar, so nothing advances silently.
+// Auto week advance: cycleStart is the date Week 1 began. The date-derived week is only ever a
+// *suggestion* shown as a banner - the user confirms, or postpones a week they had to miss.
+// Prev/Next Week only browse; they never rewrite cycleStart. Only fixDrift / startCycleToday /
+// startNewCycle re-anchor, and each is an explicit button press.
 var autoWeek=lget('autoWeek',false);
 var cycleStart=lget('cycleStart',null);
-// one postpone per real week: after postponing, the next one unlocks 7 days later,
-// so repeated taps can't silently push the cycle out by months.
 var lastPostpone=lget('lastPostpone',null);
+var lastExport=lget('lastExport',null);
 
 var wDows=lget('dows',[1,2,4,5]);
 if(!Array.isArray(wDows)||!wDows.length)wDows=[1,2,4,5];
@@ -872,24 +944,25 @@ var lang=lget('lang','ko');
 var roundUnit=lget('roundUnit',2.5);
 // volume tier: scales SET COUNT only (intensity % and reps/set stay coach/Prilepin-matched)
 var volTier=lget('volTier','semipro');
+// weekly intensity wave on the classic lifts (see WAVE above)
+var waveOn=lget('waveOn',true);
 // Heavy-single primers: the base program tops out at 80-85% until week 10, leaving a 9-week gap
 // with zero 90%+ exposure. These add 2x1 @90% on specific days to keep neural familiarity with
 // heavy loads, without meaningfully adding volume. Opt-in; base program data is never mutated.
 var heavySingles=lget('heavySingles',false);
-// weekIdx -> { dayIdx: baseLift }  (week 3,6,8 in 1-based = idx 2,5,7)
 var HEAVY_PLAN={2:{0:'snatch',1:'cleanjerk'},5:{0:'snatch',1:'cleanjerk'},7:{0:'snatch',1:'cleanjerk'}};
 var HEAVY_PCT=0.90, HEAVY_SETS=2;
 var VOL_TIER_MULT={hobby:0.7,semipro:1.0,national:1.35};
 // body metrics for level analysis
 var bodyMetrics=lget('body',{bw:null,ht:null,sex:'m'});
-// Level bands by Sinclair score (bodyweight-normalized total): [minSinclair, levelKey, recommendedTier] (high -> low).
-// Male breakpoints follow publicly-cited Sinclair benchmark guides (Local 300 / Regional 350 / National 400 / International 450+).
-// Female breakpoints are an approximation (~65% of male values, per general reporting that female Sinclair benchmarks
-// run roughly 60-70% of male ones) since no equivalent official female-specific benchmark table was verified.
-// This replaces an earlier body-weight-ratio heuristic that had no cited source at all.
+// Sinclair coefficients: IWF 2021-2024 Olympiad values (the current published cycle).
+var SINCLAIR={m:{A:0.722762521,b:193.609},f:{A:0.787004341,b:153.757}};
+// Level bands by Sinclair score: [minSinclair, levelKey, recommendedTier] (high -> low).
+// Male breakpoints follow the publicly cited benchmark guide (Local 300 / Regional 350 /
+// National 400 / International 450+). Female breakpoints are an unofficial ~65% approximation.
 var LEVEL_STD={
- m:[[450,'national','national'],[375,'semipro','semipro'],[300,'inter','semipro'],[250,'novice','hobby'],[0,'entry','hobby']],
- f:[[293,'national','national'],[244,'semipro','semipro'],[195,'inter','semipro'],[163,'novice','hobby'],[0,'entry','hobby']]
+ m:[[450,'national','national'],[400,'semipro','semipro'],[350,'inter','semipro'],[300,'novice','hobby'],[0,'entry','hobby']],
+ f:[[293,'national','national'],[260,'semipro','semipro'],[228,'inter','semipro'],[195,'novice','hobby'],[0,'entry','hobby']]
 };
 function detectTodayDayIdx(){
   if(!Array.isArray(wDows))return null;
@@ -897,14 +970,12 @@ function detectTodayDayIdx(){
 }
 var curDay=(function(){var a=detectTodayDayIdx();return a!==null?a:lget('day',0);}());
 var curFilter='all',chartInst=null;
-var tTotal=150,tLeft=150,tRun=false,tInt=null,tOpen=false;
+var tTotal=150,tLeft=150,tRun=false,tInt=null,tOpen=false,tEndAt=0,audioCtx=null;
 var calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel=null;
 var tmpDows=[].concat(wDows);
 
 // ===== HELPERS =====
 function L(){
-  // A corrupt stored lang (anything not 'ko'/'en') used to make L() undefined, which threw on the
-  // first property access inside applyLang() and left the whole UI blank on every launch.
   if(!LNG[lang]){lang='ko';lset('lang','ko');}
   return LNG[lang];
 }
@@ -913,6 +984,7 @@ function W(){
   if(i!==curWeek){curWeek=i;lset('week',i);}
   return WEEKS[i];
 }
+function wkName(i){return lang==='ko'?WEEKS[i].lk:WEEKS[i].le;}
 function heavyFor(wk,di){
   if(!heavySingles)return null;
   var plan=HEAVY_PLAN[wk];
@@ -925,12 +997,30 @@ function heavyFor(wk,di){
            '신경계 적응용 — 완벽한 자세로 1회씩, 실패 시 중단',
            'Neural primer - one clean rep per set; stop on a miss');
 }
-// day object with primer appended (base data untouched)
+// weekly wave: classic lifts only, never the ladder/PR day, never squats or presses
+function waveFor(wk,ex){
+  if(!waveOn||!ex||ex.ladder)return 0;
+  if(ex.base!=='snatch'&&ex.base!=='cleanjerk')return 0;
+  return WAVE[wk]||0;
+}
+// day object with wave applied and primer appended (base program data is never mutated)
 function dayOf(wk,di){
   var d=WEEKS[wk].days[di];
+  var list=d.ex.map(function(e){
+    var w=waveFor(wk,e);
+    if(!w)return e;
+    var c={};for(var k in e){if(Object.prototype.hasOwnProperty.call(e,k))c[k]=e[k];}
+    c.pct=Math.round((e.pct+w)*1000)/1000;
+    return c;
+  });
   var hv=heavyFor(wk,di);
-  if(!hv)return d;
-  return {sk:d.sk,se:d.se,ex:d.ex.concat([hv])};
+  // A primer only makes sense when the day is not already heavy. With the wave on, week 8's C&J
+  // reaches 90% by itself, and adding 2x1 @90% on top would push that zone past Prilepin's ceiling.
+  if(hv){
+    var alreadyHeavy=list.some(function(e){return e.base===hv.base&&!e.ladder&&e.pct>=HEAVY_PCT-0.02;});
+    if(!alreadyHeavy)list=list.concat([hv]);
+  }
+  return{sk:d.sk,se:d.se,ex:list};
 }
 function getPR(k){return prs[k]||DEFAULTS[k]||80;}
 function roundW(w){return Math.round((Math.round(w/roundUnit)*roundUnit)*100)/100;}
@@ -949,8 +1039,16 @@ function setKey(ds,di,ei,si){return ds+'-'+di+'-'+ei+'-'+si;}
 function dateWorkoutDay(date){var d=date.getDay();var i=wDows.indexOf(d);return i===-1?null:i;}
 function hasLog(ds){return Object.keys(setStates).some(function(k){return k.indexOf(ds)===0&&(setStates[k]==='d'||setStates[k]==='f');});}
 function isPRWeek(){return curWeek===10;}
-function stampWeek(ds){if(dweek[ds]==null){dweek[ds]=curWeek;lset('dweek',dweek);}}
+// Stamp which program week (and volume tier) a date was trained under.
+// Past dates are immutable history. Today stays editable, so a session recorded while the wrong
+// week was on screen self-corrects as soon as you go back to the right week and tap a set.
+function stampWeek(ds){
+  var isToday=(ds===todayStr());
+  if(dweek[ds]==null||isToday){if(dweek[ds]!==curWeek){dweek[ds]=curWeek;lset('dweek',dweek);}}
+  if(dtier[ds]==null||isToday){if(dtier[ds]!==volTier){dtier[ds]=volTier;lset('dtier',dtier);}}
+}
 function weekOf(ds){return dweek[ds]!=null?dweek[ds]:null;}
+function tierOf(ds){return dtier[ds]!=null?dtier[ds]:null;}
 function extraScope(){return todayStr()+'-D'+curDay;}
 function getExtras(scope){return lget('extra_'+scope,[]);}
 function setExtras(scope,arr){lset('extra_'+scope,arr);}
@@ -984,6 +1082,9 @@ function applyLang(){
   document.getElementById('BTN_APPLY_TIER').textContent=l.applyTier;
   document.getElementById('LEVEL_FOOT').textContent=l.levelFoot;
   renderLevelBox();
+  document.getElementById('S_WAVE').textContent=l.sWave;
+  document.getElementById('WAVE_HINT').textContent=l.waveHint;
+  renderWaveRow();renderWaveBox();
   document.getElementById('S_HEAVY').textContent=l.sHeavy;
   document.getElementById('HEAVY_HINT').textContent=l.heavyHint;
   renderHeavyRow();renderHeavyBox();
@@ -999,7 +1100,9 @@ function applyLang(){
   document.getElementById('BTN_EXP').textContent=l.btnExp;
   document.getElementById('BTN_IMP').textContent=l.btnImp;
   document.getElementById('BTN_RESET_ALL').textContent=l.btnResetAll;
+  renderLastExport();
   document.getElementById('S_INST').textContent=l.sInst;
+  document.getElementById('INST_WARN').innerHTML=l.instWarn;
   document.getElementById('IOS1').textContent=l.ios1;
   document.getElementById('IOS2').textContent=l.ios2;
   document.getElementById('AND1').textContent=l.and1;
@@ -1057,8 +1160,8 @@ function saveAdj(ds,di,ei,obj){
 }
 function repsIsNumeric(r){return String(r).indexOf('+')===-1;}
 function effW(ex,adj){return Math.max(20,roundW(getPR(ex.base)*ex.pct)+(adj.w||0));}
-function baseSets(ex){return Math.max(1,Math.min(12,Math.round(ex.sets*(VOL_TIER_MULT[volTier]||1))));}
-function effSets(ex,adj){return Math.max(1,Math.min(12,baseSets(ex)+(adj.s||0)));}
+function baseSets(ex,tier){var m=VOL_TIER_MULT[tier||volTier]||1;return Math.max(1,Math.min(12,Math.round(ex.sets*m)));}
+function effSets(ex,adj,tier){return Math.max(1,Math.min(12,baseSets(ex,tier)+(adj.s||0)));}
 function effReps(ex,adj){
   if(!repsIsNumeric(ex.reps))return ex.reps;
   return String(Math.max(1,Math.min(30,(parseInt(ex.reps)||1)+(adj.r||0))));
@@ -1092,6 +1195,35 @@ function renderVolTierRow(){
   }).join('');
 }
 
+// ===== INTENSITY WAVE =====
+function setWave(on){
+  waveOn=!!on;lset('waveOn',waveOn);
+  renderWaveRow();renderWaveBox();renderToday();
+  if(document.getElementById('screen-program').classList.contains('active'))renderProgram();
+  toast(L().waveNames[waveOn?'on':'off']);
+}
+function renderWaveRow(){
+  var l=L();
+  document.getElementById('WAVE_ROW').innerHTML=[['on',true],['off',false]].map(function(p){
+    return '<button class="lbtn'+(waveOn===p[1]?' active':'')+'" onclick="setWave('+p[1]+')">'+l.waveNames[p[0]]+'</button>';
+  }).join('');
+}
+function waveLabel(wk){
+  var v=WAVE[wk]||0;
+  if(!waveOn||!v)return L().waveNone;
+  return '+'+(Math.round(v*1000)/10)+'%';
+}
+function renderWaveBox(){
+  var l=L();var box=document.getElementById('WAVE_BOX');
+  if(!box)return;
+  if(!waveOn){box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.waveOffMsg+'</div>';return;}
+  var wks=[];
+  for(var i=0;i<12;i++){if(WAVE[i])wks.push((i+1)+(lang==='ko'?'주 +':'w +')+(Math.round(WAVE[i]*1000)/10)+'%');}
+  box.innerHTML='<div class="drow"><span>'+l.waveScopeL+'</span><span><b style="color:var(--b)">'+l.waveScopeV+'</b></span></div>'+
+    '<div class="drow"><span>'+l.waveWeeksL+'</span><span><b style="color:var(--o)">'+wks.join(', ')+'</b></span></div>'+
+    '<div class="drow"><span>'+l.waveCurL+'</span><span><b style="color:var(--g)">'+waveLabel(curWeek)+'</b></span></div>';
+}
+
 function setHeavySingles(on){
   heavySingles=!!on;lset('heavySingles',heavySingles);
   renderHeavyRow();renderHeavyBox();renderToday();
@@ -1110,11 +1242,16 @@ function renderHeavyBox(){
   if(!box)return;
   if(!heavySingles){box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.heavyOffMsg+'</div>';return;}
   var wks=Object.keys(HEAVY_PLAN).map(function(k){return parseInt(k)+1;}).sort(function(a,b){return a-b;});
-  var html='<div class="drow"><span>'+l.heavyWeeksL+'</span><span><b style="color:var(--o)">'+wks.map(function(n){return n+(lang==='ko'?'주':'w');}).join(', ')+'</b></span></div>'+
+  box.innerHTML='<div class="drow"><span>'+l.heavyWeeksL+'</span><span><b style="color:var(--o)">'+wks.map(function(n){return n+(lang==='ko'?'주':'w');}).join(', ')+'</b></span></div>'+
     '<div class="drow"><span>'+l.heavyLoadL+'</span><span><b style="color:var(--b)">'+Math.round(HEAVY_PCT*100)+'% x 1 x '+HEAVY_SETS+(lang==='ko'?'세트':' sets')+'</b></span></div>'+
     '<div class="drow"><span>'+l.heavyCurL+'</span><span><b style="color:var(--g)">'+
       (HEAVY_PLAN[curWeek]?(l.heavyOnThisWeek):(l.heavyNotThisWeek))+'</b></span></div>';
-  box.innerHTML=html;
+}
+function renderLastExport(){
+  var el=document.getElementById('LAST_EXPORT');
+  if(!el)return;
+  var l=L();
+  el.textContent=l.lastExportL+': '+(lastExport||l.neverExported);
 }
 function renderAutoRow(){
   var l=L();
@@ -1128,10 +1265,12 @@ function renderAutoBox(){
   if(!box)return;
   var pb=document.getElementById('BTN_POSTPONE_SET');
   var fb=document.getElementById('BTN_FIX_DRIFT');
+  var rb=document.getElementById('BTN_RESYNC_SET');
   var row=document.getElementById('AUTO_START_ROW');
   var inp=document.getElementById('AUTO_START_INPUT');
-  var drift=weekDrift();
-  if(row)row.style.display=autoWeek?'flex':'none';
+  var cw=computedWeek();
+  var mismatch=(cw!==null&&cw!==curWeek);
+  if(row)row.style.display=cycleStart?'flex':'none';
   if(inp&&cycleStart)inp.value=cycleStart;
   if(pb){
     pb.style.display=autoWeek?'block':'none';
@@ -1140,31 +1279,33 @@ function renderAutoBox(){
     pb.disabled=pl>0;
     pb.style.opacity=pl>0?'.5':'1';
   }
-  if(fb){
-    fb.style.display=(autoWeek&&drift>0)?'block':'none';
-    fb.textContent=l.btnFixDrift;
-    fb.style.color='var(--g)';fb.style.borderColor='rgba(29,158,117,.5)';
+  if(rb){
+    rb.style.display=mismatch?'block':'none';
+    rb.textContent=l.btnResync.replace('{c}',cw!==null?wkName(cw):'');
+    rb.style.color='var(--g)';rb.style.borderColor='rgba(29,158,117,.5)';
   }
-  if(!autoWeek){
-    box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+l.autoOffMsg+'</div>';
+  if(fb){
+    fb.style.display=mismatch?'block':'none';
+    fb.textContent=l.btnFixDrift;
+  }
+  if(!cycleStart){
+    box.innerHTML='<div style="font-size:12px;color:var(--tx2);">'+(autoWeek?l.needCycleStart:l.autoOffMsg)+'</div>';
     return;
   }
-  var cw=computedWeek();
-  var cwName=cw===null?'—':(cycleDone()?l.cycleEndShort:(lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le));
-  var curName=lang==='ko'?W().lk:W().le;
+  var cwName=cw===null?'—':(cycleDone()?l.cycleEndShort:wkName(cw));
   box.innerHTML=
     '<div class="drow"><span>'+l.autoStartL+'</span><span><b>'+(cycleStart||l.cycleStartNone)+'</b></span></div>'+
     '<div class="drow"><span>'+l.autoNowL+'</span><span><b style="color:var(--b)">'+cwName+'</b></span></div>'+
-    '<div class="drow"><span>'+l.autoSavedL+'</span><span><b style="color:var(--g)">'+curName+'</b></span></div>'+
-    (drift>0?'<div class="drow"><span style="color:var(--r)">'+l.driftL+'</span><span><b style="color:var(--r)">'+l.driftVal.replace('{n}',drift)+'</b></span></div>':'');
+    '<div class="drow"><span>'+l.autoSavedL+'</span><span><b style="color:var(--g)">'+wkName(curWeek)+'</b></span></div>'+
+    (mismatch?'<div class="drow"><span style="color:var(--r)">'+l.driftL+'</span><span><b style="color:var(--r)">'+l.driftVal.replace('{n}',Math.abs(curWeek-cw))+'</b></span></div>':'')+
+    (autoWeek?'':'<div style="font-size:11px;color:var(--tx2);margin-top:6px;">'+l.autoOffMsg+'</div>');
 }
 
 // ===== BODY METRICS & LEVEL =====
 function sinclairTotal(total,bw,sex){
   if(!bw||bw<=0)return null;
-  var A=sex==='f'?0.783497476:0.751945030;
-  var b=sex==='f'?153.655:175.508;
-  var coef=bw>=b?1:Math.pow(10,A*Math.pow(Math.log(bw/b)/Math.LN10,2));
+  var c=SINCLAIR[sex==='f'?'f':'m'];
+  var coef=bw>=c.b?1:Math.pow(10,c.A*Math.pow(Math.log(bw/c.b)/Math.LN10,2));
   return Math.round(total*coef*10)/10;
 }
 function classifyLevel(){
@@ -1224,32 +1365,35 @@ function renderBodyInputs(){
   document.getElementById('SEX_F').classList.toggle('active',bodyMetrics.sex==='f');
   renderLevelBox();
 }
-
+// ===== WEEK NAVIGATION =====
 function renderHeader(){
   var w=W();
-  document.getElementById('H_SUB').textContent=(lang==='ko'?w.lk:w.le)+' · 12'+(lang==='ko'?'주 사이클':'-week cycle');
+  var extra=(waveOn&&WAVE[curWeek])?(' · '+waveLabel(curWeek)):'';
+  document.getElementById('H_SUB').textContent=(lang==='ko'?w.lk:w.le)+' · 12'+(lang==='ko'?'주 사이클':'-week cycle')+extra;
 }
-function setWeek(i,reanchor){
+// Browsing only. Nothing here touches cycleStart - re-anchoring is always an explicit button.
+function setWeek(i){
   curWeek=(i+12)%12;
   lset('week',curWeek);
-  if(reanchor!==false&&autoWeek)reanchorCycle(curWeek);
   renderHeader();renderToday();
   if(document.getElementById('screen-program').classList.contains('active'))renderProgram();
-  if(document.getElementById('screen-pr').classList.contains('active'))renderAutoBox();
+  if(document.getElementById('screen-pr').classList.contains('active')){renderAutoBox();renderWaveBox();renderHeavyBox();}
 }
-function cycleWeek(d){setWeek(curWeek+(d||1));toast(lang==='ko'?W().lk:W().le);}
+function cycleWeek(d){setWeek(curWeek+(d||1));toast(wkName(curWeek));}
+// "Today" restores BOTH the training day and the program week from the calendar.
 function goToday(){
   var a=detectTodayDayIdx();
   if(a!==null){curDay=a;lset('day',curDay);}
+  var cw=computedWeek();
+  if(cw!==null&&cw!==curWeek){curWeek=cw;lset('week',curWeek);}
   renderHeader();
   sw('today');
-  toast(lang==='ko'?'오늘로 이동':'Jumped to today');
+  if(cw===null)toast(L().goTodayNoCycle);
+  else toast(L().goTodayDone.replace('{w}',wkName(curWeek)));
 }
 
 // ===== AUTO WEEK ADVANCE =====
 function parseDate(s){return new Date(s+'T00:00:00');}
-// A string can match YYYY-MM-DD and still be an impossible date (2026-13-45).
-// Everything downstream (computedWeek -> WEEKS[idx]) breaks on NaN, so validate strictly here.
 function isValidDateStr(s){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))return false;
   var d=parseDate(s);
@@ -1262,9 +1406,19 @@ function shiftDateStr(s,days){
   var t=parseDate(s);t.setDate(t.getDate()+days);
   return dStr(t.getFullYear(),t.getMonth(),t.getDate());
 }
-// Raw (unclamped) elapsed week index. computedWeek() clamps to 11 for scheduling, which meant
-// that once 12 weeks had passed the app sat on "W12 recovery" forever: computed == curWeek, so
-// no banner ever fired and the cycle could never roll over to a fresh week 1.
+// Program weeks should start on your first training day of the week, not on whatever weekday you
+// happened to press the button. Otherwise Day 1 (e.g. Monday) falls into the previous week block.
+function weekStartDow(){
+  var d=wDows.slice().sort(function(a,b){return a-b;});
+  return d.length?d[0]:1;
+}
+function snapToWeekStart(ds){
+  if(!isValidDateStr(ds))return ds;
+  var t=parseDate(ds);
+  var diff=(t.getDay()-weekStartDow()+7)%7;
+  t.setDate(t.getDate()-diff);
+  return dStr(t.getFullYear(),t.getMonth(),t.getDate());
+}
 function rawCycleWeek(){
   if(!isValidDateStr(cycleStart))return null;
   var d=Math.floor((parseDate(todayStr())-parseDate(cycleStart))/86400000);
@@ -1277,20 +1431,18 @@ function computedWeek(){
   if(r<0)return 0;
   return Math.max(0,Math.min(11,r));
 }
-// true once the calendar has moved past the final week of the cycle
 function cycleDone(){
   var r=rawCycleWeek();
   return r!==null && r>11;
 }
+function reanchorCycle(wk){cycleStart=shiftDateStr(snapToWeekStart(todayStr()),-wk*7);lset('cycleStart',cycleStart);}
 function startNewCycle(){
   reanchorCycle(0);
   lastPostpone=null;lset('lastPostpone',null);
-  setWeek(0,false);
+  setWeek(0);
   renderAutoBox();
   toast(L().newCycleDone);
 }
-// re-anchor so that the given week index is "this week" by the calendar
-function reanchorCycle(wk){cycleStart=shiftDateStr(todayStr(),-wk*7);lset('cycleStart',cycleStart);}
 function setAutoWeek(on){
   autoWeek=!!on;lset('autoWeek',autoWeek);
   if(autoWeek&&!cycleStart)reanchorCycle(curWeek);
@@ -1300,14 +1452,22 @@ function setAutoWeek(on){
 function startCycleToday(){
   if(!confirm(L().confirmStartToday))return;
   reanchorCycle(0);
-  setWeek(0,false);
+  setWeek(0);
   renderAutoBox();
   toast(L().saved);
 }
 function advanceToComputed(){
   var cw=computedWeek();if(cw===null)return;
-  setWeek(cw,false);
-  toast(L().advanced+' — '+(lang==='ko'?W().lk:W().le));
+  setWeek(cw);
+  toast(L().advanced+' — '+wkName(curWeek));
+}
+// Jump the screen back to the week the calendar says you are in. Does not touch cycleStart.
+function resyncWeek(){
+  var cw=computedWeek();
+  if(cw===null){toast(L().needCycleStart);return;}
+  setWeek(cw);
+  renderAutoBox();
+  toast(L().resynced.replace('{w}',wkName(cw)));
 }
 function postponeDaysLeft(){
   if(!isValidDateStr(lastPostpone))return 0;
@@ -1325,13 +1485,7 @@ function postponeWeek(){
   if(document.getElementById('screen-cal').classList.contains('active'))renderCal();
   toast(L().postponed);
 }
-// Over-postponing pushes cycleStart into the future, so the calendar-derived week falls
-// *behind* the week you've actually completed. That gap is the drift we can auto-detect and undo.
-function weekDrift(){
-  if(!autoWeek||!cycleStart)return 0;
-  var cw=computedWeek();
-  return cw===null?0:(curWeek-cw);
-}
+// Move the start date so the week you are actually running becomes this week.
 function fixDrift(){
   if(!isValidDateStr(cycleStart)){toast(L().needCycleStart);return;}
   reanchorCycle(curWeek);
@@ -1372,17 +1526,18 @@ function renderAutoWeekBanner(){
       '<button class="gbtn" style="margin-top:0;padding:9px 6px;font-size:12.5px;" onclick="startNewCycle()">'+l.btnNewCycle+'</button>';
     return;
   }
+  if(cw===curWeek){el.style.display='none';return;}
   if(cw<curWeek){
-    var dr=curWeek-cw;
     el.style.display='block';
-    el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.driftTitle+'</div>'+
+    el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.resyncTitle+'</div>'+
       '<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">'+
-        l.driftSub.replace('{n}',dr).replace('{w}',lang==='ko'?W().lk:W().le)+'</div>'+
-      '<button class="gbtn" style="margin-top:0;padding:9px 6px;font-size:12.5px;" onclick="fixDrift()">'+l.btnFixDrift+'</button>';
+        l.resyncSub.replace('{c}',wkName(cw)).replace(/\{w\}/g,wkName(curWeek))+'</div>'+
+      '<div style="display:flex;gap:8px;">'+
+      '<button class="gbtn" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="resyncWeek()">'+l.btnResync.replace('{c}',wkName(cw))+'</button>'+
+      '<button class="ghostb" style="margin-top:0;flex:1;padding:9px 6px;font-size:12.5px;" onclick="fixDrift()">'+l.btnAnchorHere.replace('{w}',wkName(curWeek))+'</button></div>';
     return;
   }
-  if(cw===curWeek){el.style.display='none';return;}
-  var name=lang==='ko'?WEEKS[cw].lk:WEEKS[cw].le;
+  var name=wkName(cw);
   var pl=postponeDaysLeft();
   el.style.display='block';
   el.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;">'+l.autoNewWeek+'</div>'+
@@ -1393,28 +1548,38 @@ function renderAutoWeekBanner(){
 }
 
 // ===== PRILEPIN VOLUME =====
-// zones: [pctLow, pctHigh, minReps, optimalReps, maxReps] — contiguous, half-open [low,high)
+// zones: [pctLow, pctHigh, minReps, optimalReps, maxReps] - contiguous, half-open [low,high)
 // Source: A.S. Prilepin's chart (55-65%:24[18-30], 70-80%:18[12-24], 80-90%:15[10-20], 90%+:7[4-10]).
-// Boundaries nudged by 0.5%pt to close the ambiguous 65-70%/75-80% gaps between cited versions of the table.
-// No official data exists below ~55%, so intensities under that are intentionally left unclassified (no fabricated zone).
+// Boundaries nudged by 0.5%pt to close the ambiguous 65-70%/75-80% gaps between cited versions.
+// No official data exists below ~55%, so lower intensities are left unclassified on purpose.
 var PRILEPIN=[[0.545,0.695,18,24,30],[0.695,0.795,12,18,24],[0.795,0.895,10,15,20],[0.895,3,4,7,10]];
+// Weeks where classic-lift volume is deliberately below Prilepin's optimum: deload, squat peak,
+// singles, PR week and recovery. Flagging those red every session would only train you to ignore
+// the indicator, so 'low' is shown there as 'planned' instead. 'High' always stays a real warning.
+var TAPER_WEEKS={4:1,8:1,9:1,10:1,11:1};
 function getPrilepinZone(p){for(var i=0;i<PRILEPIN.length;i++){if(p>=PRILEPIN[i][0]&&p<PRILEPIN[i][1])return PRILEPIN[i];}return null;}
+// Prilepin's totals are defined PER EXERCISE and for the competition lifts. Pulls, jerk drives,
+// rack jerks, OHS and squats sit on a different 1RM basis, so counting them here would be wrong.
+// Heavy-single primers are deliberate 2-rep neural doses, not a volume block, so they are exempt too.
+var CLASSIC_TIP={lift:1,power:1,'3pos':1};
+function isClassic(ex){return !ex.ladder&&!!ex.tip&&!!CLASSIC_TIP[ex.tip]&&(ex.base==='snatch'||ex.base==='cleanjerk');}
+function zoneStatus(reps,z){var st=reps<z[2]?'low':reps>z[4]?'high':'ok';return (st==='low'&&TAPER_WEEKS[curWeek])?'planned':st;}
 function calcDayVolume(){
   var ds=todayStr();
-  var totalKg=0,mainKg=0,extraKg=0,snatchKg=0,cjKg=0,pReps=0,pMin=0,pMax=0,pExtraReps=0;
+  var totalKg=0,mainKg=0,extraKg=0,snatchKg=0,cjKg=0;
+  var items=[];
   dayOf(curWeek,curDay).ex.forEach(function(ex,ei){
-    if(ex.acc||ex.ladder)return;
+    if(ex.ladder)return;
     var adj=getAdj(ds,curDay,ei);
     var w=effW(ex,adj),reps=repsCount(effReps(ex,adj)),sets=effSets(ex,adj),vol=w*reps*sets;
     totalKg+=vol;mainKg+=vol;
     if(ex.base==='snatch')snatchKg+=vol;
     if(ex.base==='cleanjerk')cjKg+=vol;
-    if((ex.base==='snatch'||ex.base==='cleanjerk')){
+    if(isClassic(ex)){
       var z=getPrilepinZone(w/getPR(ex.base));
-      if(z){pReps+=reps*sets;pMin+=z[2];pMax+=z[4];}
+      if(z)items.push({name:exName(ex),reps:reps*sets,min:z[2],opt:z[3],max:z[4],status:zoneStatus(reps*sets,z)});
     }
   });
-  // extras (warm-up + accessories): all weighted work counts toward daily total
   getExtras(extraScope()).forEach(function(ex){
     if(ex.weight==null||isNaN(ex.weight)||ex.weight<=0)return;
     var vol=ex.weight*(ex.reps||1)*ex.sets;
@@ -1422,37 +1587,47 @@ function calcDayVolume(){
     if(ex.pril==='snatch')snatchKg+=vol;
     if(ex.pril==='cleanjerk')cjKg+=vol;
     if(ex.pril){
-      var z=getPrilepinZone(ex.weight/getPR(ex.pril));
-      if(z){pReps+=(ex.reps||1)*ex.sets;pExtraReps+=(ex.reps||1)*ex.sets;pMin+=z[2];pMax+=z[4];}
+      var z2=getPrilepinZone(ex.weight/getPR(ex.pril));
+      var r2=(ex.reps||1)*ex.sets;
+      if(z2)items.push({name:lang==='ko'?ex.nameKo:ex.nameEn,reps:r2,min:z2[2],opt:z2[3],max:z2[4],status:zoneStatus(r2,z2)});
     }
   });
-  return{totalKg:Math.round(totalKg),mainKg:Math.round(mainKg),extraKg:Math.round(extraKg),snatchKg:Math.round(snatchKg),cjKg:Math.round(cjKg),pReps:pReps,pMin:pMin,pMax:pMax,pExtraReps:pExtraReps};
+  return{totalKg:Math.round(totalKg),mainKg:Math.round(mainKg),extraKg:Math.round(extraKg),snatchKg:Math.round(snatchKg),cjKg:Math.round(cjKg),items:items};
+}
+function statusStyle(st){
+  var l=L();
+  if(st==='low')return{t:l.stLow,c:'var(--r)',bg:'rgba(226,75,74,.12)'};
+  if(st==='high')return{t:l.stHigh,c:'var(--o)',bg:'rgba(186,117,23,.12)'};
+  if(st==='planned')return{t:l.stPlanned,c:'var(--tx3)',bg:'rgba(153,153,153,.12)'};
+  return{t:l.stOk,c:'var(--g)',bg:'rgba(29,158,117,.12)'};
 }
 function renderVolumeBanner(){
+  var l=L();
   var v=calcDayVolume();var b=document.getElementById('VOL_BANNER');
-  var hasZone=v.pMax>0;
-  var pct=(hasZone&&v.pReps>0)?Math.min(110,Math.round(v.pReps/v.pMax*100)):0;
-  var low=hasZone&&v.pReps<v.pMin, high=hasZone&&v.pReps>v.pMax;
-  var barC=!hasZone?'var(--tx3)':low?'var(--r)':high?'var(--o)':'var(--g)';
-  var st=!hasZone?(lang==='ko'?'해당없음':'N/A'):low?(lang==='ko'?'부족':'Low'):high?(lang==='ko'?'과잉':'High'):(lang==='ko'?'적정':'OK');
-  var stBg=!hasZone?'rgba(153,153,153,.12)':low?'rgba(226,75,74,.12)':high?'rgba(186,117,23,.12)':'rgba(29,158,117,.12)';
-  var stC=!hasZone?'var(--tx3)':low?'var(--r)':high?'var(--o)':'var(--g)';
-  var breakdown=lang==='ko'?('메인 '+v.mainKg.toLocaleString()+'kg'+(v.extraKg>0?' + 추가 '+v.extraKg.toLocaleString()+'kg':'')):('Main '+v.mainKg.toLocaleString()+'kg'+(v.extraKg>0?' + extras '+v.extraKg.toLocaleString()+'kg':''));
+  var breakdown=lang==='ko'
+    ?('메인 '+v.mainKg.toLocaleString()+'kg'+(v.extraKg>0?' + 추가 '+v.extraKg.toLocaleString()+'kg':''))
+    :('Main '+v.mainKg.toLocaleString()+'kg'+(v.extraKg>0?' + extras '+v.extraKg.toLocaleString()+'kg':''));
+  var rows=v.items.length?v.items.map(function(it){
+    var s=statusStyle(it.status);
+    var pct=Math.min(100,Math.round(it.reps/it.max*100));
+    return '<div class="pril-row">'+
+      '<span class="pril-name">'+it.name+'</span>'+
+      '<span class="pril-num">'+it.reps+' / '+it.min+'~'+it.max+'</span>'+
+      '<span class="vol-status" style="background:'+s.bg+';color:'+s.c+'">'+s.t+'</span></div>'+
+      '<div class="vol-bar-track" style="margin-bottom:4px;"><div class="vol-bar-fill" style="width:'+pct+'%;background:'+s.c+';"></div></div>';
+  }).join(''):'<div style="font-size:11px;color:var(--tx2);padding:4px 0;">'+l.prilNone+'</div>';
   b.innerHTML=
    '<div class="vol-item"><span class="vol-label">'+(lang==='ko'?'일일 총볼륨 (모든 운동)':'Total volume (all exercises)')+'</span><span class="vol-value">'+v.totalKg.toLocaleString()+'<span class="vol-unit"> kg</span></span>'+
     '<div style="font-size:10px;color:var(--tx2);margin-top:2px;">'+breakdown+'</div></div>'+
    '<div class="vol-item"><span class="vol-label">'+(lang==='ko'?'스내치 볼륨':'Snatch vol')+'</span><span class="vol-value" style="color:var(--g)">'+v.snatchKg.toLocaleString()+'<span class="vol-unit"> kg</span></span></div>'+
    '<div class="vol-item"><span class="vol-label">'+(lang==='ko'?'C&J 볼륨':'C&J vol')+'</span><span class="vol-value" style="color:var(--b)">'+v.cjKg.toLocaleString()+'<span class="vol-unit"> kg</span></span></div>'+
-   '<div class="vol-item" style="min-width:100%;margin-top:2px;">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
-     '<span class="vol-label">Prilepin '+(lang==='ko'?'적정 범위':'range')+' ('+(hasZone?(v.pMin+'~'+v.pMax+' reps'):'—')+')</span>'+
-     '<span class="vol-status" style="background:'+stBg+';color:'+stC+'">'+st+'</span></div>'+
-    '<div class="vol-bar-track"><div class="vol-bar-fill" style="width:'+Math.min(pct,100)+'%;background:'+barC+';"></div></div>'+
-    '<div style="font-size:10px;color:var(--tx2);margin-top:3px;">'+(!hasZone?(lang==='ko'?'이 날은 Prilepin 기준 범위 밖 강도예요 (스피드/회복/기록 도전)':'Intensity outside Prilepin range (speed/recovery/PR day)'):(lang==='ko'?'주종목 '+v.pReps+'렙 / 기준 '+v.pMax+'렙'+(v.pExtraReps>0?' (보조 +'+v.pExtraReps+'렙 포함)':''):'Main lifts '+v.pReps+' / target '+v.pMax+(v.pExtraReps>0?' (+'+v.pExtraReps+' from extras)':'')))+'</div></div>';
+   '<div class="vol-item" style="min-width:100%;margin-top:4px;">'+
+    '<span class="vol-label" style="margin-bottom:4px;">'+l.prilTitle+'</span>'+rows+
+    '<div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.5;">'+l.prilFoot+'</div></div>';
 }
 // ===== TODAY =====
 function renderToday(){
-  var l=L(),w=W(),dd=dayOf(curWeek,curDay);
+  var l=L(),dd=dayOf(curWeek,curDay);
   document.getElementById('D_TITLE').textContent='Day '+(curDay+1);
   var dow=wDows[curDay];
   var todayIdx=detectTodayDayIdx();
@@ -1487,17 +1662,14 @@ function renderToday(){
   var list=document.getElementById('EX_LIST');list.innerHTML='';
   dd.ex.forEach(function(ex,ei){
     var div=document.createElement('div');
-    div.className='exc'+(ex.acc?' exc-acc':'')+(ex.ladder?' exc-lad':'');
+    div.className='exc'+(ex.ladder?' exc-lad':'');
     var noteHtml=exNote(ex)?'<div class="exd">'+exNote(ex)+'</div>':'';
     var tipHtml=ex.tip?'<button class="tipbtn" onclick="goTip(\''+ex.tip+'\')" title="tip"><i class="ti ti-info-circle"></i></button>':'';
     var adj=getAdj(ds,curDay,ei);
     var adjusted=(adj.w||adj.s||adj.r);
     var chipRow,ctrlRow='';
     var nSets;
-    if(ex.acc){
-      chipRow='<span class="wchip" style="background:var(--sf);color:var(--tx2);">'+(lang==='ko'?'맨몸':'BW')+'</span><span class="epct">'+(lang==='ko'?ex.rk:ex.re)+'</span>';
-      nSets=ex.sets;
-    }else if(ex.ladder){
+    if(ex.ladder){
       chipRow='<span class="wchip">'+ladderStr(ex)+'</span><span class="epct">'+l.ladderReps+'</span>';
       nSets=ex.sets;
     }else{
@@ -1592,8 +1764,6 @@ function renderExtraCat(cat){
     list.appendChild(div);
   });
 }
-// Extras are stored per date, so a new day always starts empty. Rather than re-adding the same
-// accessories by hand every session, pull forward the most recent day that had any.
 function lastExtrasFor(cat){
   var today=todayStr(), best=null, bestKey='';
   try{
@@ -1741,10 +1911,10 @@ function saveTodayToGraph(){
   if(saved===0){toast(L().savedNone);return;}
   lset('logs',logs);
   var v=calcDayVolume();
+  var off=v.items.filter(function(it){return it.status==='low'||it.status==='high';}).length;
   var pMsg='';
-  if(v.pMax>0){
-    var st=v.pReps<v.pMin?(lang==='ko'?'부족':'Low'):v.pReps>v.pMax?(lang==='ko'?'과잉':'High'):(lang==='ko'?'적정':'OK');
-    pMsg=' · Prilepin '+v.pReps+'/'+v.pMin+'~'+v.pMax+' ('+st+(v.pExtraReps>0?(lang==='ko'?', 보조 +'+v.pExtraReps:', +'+v.pExtraReps+' extra'):'')+')';
+  if(v.items.length){
+    pMsg=' · Prilepin '+(off===0?(lang==='ko'?'전 종목 적정':'all OK'):(lang==='ko'?off+'종목 범위 밖':off+' off-range'));
   }
   toast(saved+' '+L().savedDay+pMsg);
   renderVolumeBanner();
@@ -1752,22 +1922,70 @@ function saveTodayToGraph(){
 }
 
 // ===== TIMER =====
-function openTimer(s){tTotal=s;tLeft=s;tRun=false;clearInterval(tInt);updTDisp();document.getElementById('TIMER_SEC').style.display='block';tOpen=true;document.getElementById('T_BTN').textContent=L().tStart;document.getElementById('TIMER_SEC').scrollIntoView({behavior:'smooth',block:'nearest'});}
+// Timestamp-driven: setInterval is throttled or frozen when the screen sleeps, so the remaining
+// time is always recomputed from a target timestamp rather than counted down tick by tick.
+function ensureAudio(){
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return null;
+    if(!audioCtx)audioCtx=new AC();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    return audioCtx;
+  }catch(e){return null;}
+}
+function alertTimerEnd(){
+  try{if(navigator.vibrate)navigator.vibrate([200,100,200,100,300]);}catch(e){}
+  var ctx=ensureAudio();
+  if(ctx){
+    try{
+      [0,0.28,0.56].forEach(function(t){
+        var o=ctx.createOscillator(),g=ctx.createGain();
+        o.type='sine';o.frequency.value=880;
+        g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(0.3,ctx.currentTime+t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+0.2);
+        o.connect(g);g.connect(ctx.destination);
+        o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+0.22);
+      });
+    }catch(e){}
+  }
+  toast(L().tDone);
+}
+function tickTimer(){
+  if(!tRun)return;
+  tLeft=Math.max(0,Math.round((tEndAt-Date.now())/1000));
+  if(tLeft<=0){
+    tLeft=0;clearInterval(tInt);tRun=false;
+    document.getElementById('T_BTN').textContent=L().tStart;
+    updTDisp();alertTimerEnd();return;
+  }
+  updTDisp();
+}
+function openTimer(s){
+  tTotal=s;tLeft=s;tRun=false;clearInterval(tInt);
+  ensureAudio();
+  updTDisp();
+  document.getElementById('TIMER_SEC').style.display='block';tOpen=true;
+  document.getElementById('T_BTN').textContent=L().tStart;
+  try{var ts=document.getElementById('TIMER_SEC');if(ts.scrollIntoView)ts.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){}
+}
 function toggleTimer(){if(!tOpen)openTimer(150);else closeTimer();}
 function closeTimer(){clearInterval(tInt);tRun=false;document.getElementById('TIMER_SEC').style.display='none';tOpen=false;}
 function setTV(s){tTotal=s;tLeft=s;clearInterval(tInt);tRun=false;document.getElementById('T_BTN').textContent=L().tStart;updTDisp();}
-function adjT(s){tLeft=Math.max(5,tLeft+s);tTotal=Math.max(tTotal,tLeft);updTDisp();}
+function adjT(s){tLeft=Math.max(5,tLeft+s);tTotal=Math.max(tTotal,tLeft);if(tRun)tEndAt=Date.now()+tLeft*1000;updTDisp();}
 function resetT(){tLeft=tTotal;clearInterval(tInt);tRun=false;document.getElementById('T_BTN').textContent=L().tStart;updTDisp();}
 function toggleT(){
-  if(tRun){clearInterval(tInt);tRun=false;document.getElementById('T_BTN').textContent=L().tStart;}
-  else{
+  if(tRun){
+    clearInterval(tInt);tRun=false;
+    tLeft=Math.max(0,Math.round((tEndAt-Date.now())/1000));
+    document.getElementById('T_BTN').textContent=L().tStart;
+    updTDisp();
+  }else{
     if(tLeft<=0){resetT();return;}
-    tRun=true;document.getElementById('T_BTN').textContent=L().tPause;
-    tInt=setInterval(function(){
-      tLeft--;
-      if(tLeft<=0){tLeft=0;clearInterval(tInt);tRun=false;document.getElementById('T_BTN').textContent=L().tStart;}
-      updTDisp();
-    },1000);
+    ensureAudio();
+    tEndAt=Date.now()+tLeft*1000;tRun=true;
+    document.getElementById('T_BTN').textContent=L().tPause;
+    clearInterval(tInt);tInt=setInterval(tickTimer,250);tickTimer();
   }
 }
 function updTDisp(){
@@ -1776,6 +1994,7 @@ function updTDisp(){
   var c=263.9,o=c-(c*(tLeft/Math.max(tTotal,1)));
   document.getElementById('RING').style.strokeDashoffset=o;
 }
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&tRun)tickTimer();});
 // ===== CALENDAR =====
 function calMv(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
 function renderCal(){
@@ -1825,17 +2044,17 @@ function renderCalDet(ds,diOvr){
     det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div><div style="font-size:13px;color:var(--tx2);">'+l.restDay+'</div>';
     return;
   }
-  // render against the week this date was actually trained under, not the week currently in view
+  // render against the week AND volume tier this date was actually trained under
   var rec=weekOf(ds);
   var wkIdx=rec!=null?rec:curWeek;
+  var tier=tierOf(ds)||volTier;
   var dd=dayOf(wkIdx,di);
-  var wkName=lang==='ko'?WEEKS[wkIdx].lk:WEEKS[wkIdx].le;
   var wkTag='<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;margin-left:6px;white-space:nowrap;'+
     (rec!=null?'background:rgba(29,158,117,.14);color:var(--g);':'background:var(--sf);color:var(--tx3);')+
-    '">'+wkName+(rec!=null?'':' · '+l.dwkAssumed)+'</span>';
+    '">'+wkName(wkIdx)+(rec!=null?'':' · '+l.dwkAssumed)+'</span>';
   var dowN=l.dowNames[date.getDay()];
   var tot=0,done=0;
-  dd.ex.forEach(function(ex,ei){var n=ex.ladder||ex.acc?ex.sets:effSets(ex,getAdj(ds,di,ei));for(var s=0;s<n;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
+  dd.ex.forEach(function(ex,ei){var n=ex.ladder?ex.sets:effSets(ex,getAdj(ds,di,ei),tier);for(var s=0;s<n;s++){tot++;if(setStates[setKey(ds,di,ei,s)]==='d')done++;}});
   det.style.display='block';
   det.innerHTML=
     '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px;"><i class="ti ti-calendar-event" style="color:var(--g)"></i> '+ds+' ('+dowN+') — Day '+(di+1)+wkTag+'</div>'+
@@ -1846,8 +2065,8 @@ function renderCalDet(ds,diOvr){
     '</div><div style="font-size:11px;color:var(--tx3);margin-bottom:8px;">'+l.dotTip+'</div>';
   dd.ex.forEach(function(ex,ei){
     var d2=0;
-    var adj=ex.ladder||ex.acc?{}:getAdj(ds,di,ei);
-    var nSets=ex.ladder||ex.acc?ex.sets:effSets(ex,adj);
+    var adj=ex.ladder?{}:getAdj(ds,di,ei);
+    var nSets=ex.ladder?ex.sets:effSets(ex,adj,tier);
     var dots=document.createElement('div');
     dots.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:130px;';
     for(var s=0;s<nSets;s++){
@@ -1859,7 +2078,7 @@ function renderCalDet(ds,diOvr){
       (function(a,b,c,e,r){dot.addEventListener('click',function(){tapSet(a,b,c,e,r);});})(ds,di,ei,s,ex.rest);
       dots.appendChild(dot);
     }
-    var wdisp=ex.acc?(lang==='ko'?'맨몸':'BW'):ex.ladder?ladderStr(ex):effW(ex,adj)+'kg';
+    var wdisp=ex.ladder?ladderStr(ex):effW(ex,adj)+'kg';
     var row=document.createElement('div');row.className='cexr';
     row.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+exName(ex)+'</div><div style="font-size:11px;color:var(--tx2);">'+wdisp+' · '+d2+'/'+nSets+'</div></div>';
     row.appendChild(dots);
@@ -1914,11 +2133,14 @@ function renderPRInputs(){
   tmpDows=wDows.slice();
   renderDowGrid();
   renderVolTierRow();
+  renderWaveRow();
+  renderWaveBox();
   renderHeavyRow();
   renderHeavyBox();
   renderAutoRow();
   renderAutoBox();
   renderBodyInputs();
+  renderLastExport();
   updDrv();
 }
 function inpVal(k){var el=document.getElementById('PR_'+k);return el?(parseFloat(el.value)||getPR(k)):getPR(k);}
@@ -1929,6 +2151,7 @@ function updDrv(){
   var rows=[
     ['세그먼트/스내치 풀 90%','Segment/Snatch Pull 90%',roundW(sn*0.90)],
     ['클린 풀 100%','Clean Pull 100%',roundW(cj*1.00)],
+    ['랙 저크 85%','Rack Jerk 85%',roundW(cj*0.85)],
     ['저크 드라이브 95%','Jerk Drive 95%',roundW(cj*0.95)],
     ['익센트릭 데드리프트 90%','Eccentric DL 90%',roundW(cj*0.90)]
   ];
@@ -1951,19 +2174,18 @@ function renderProgram(){
   }).join('');
   var w=W();
   var dowStr=wDows.map(function(d){return l.dowNames[d];}).join(', ');
-  document.getElementById('PROG_NOTE').innerHTML=(lang==='ko'?w.nk:w.ne)+'<br><span style="opacity:.7">'+dowStr+' · '+l.volTierNames[volTier]+'</span>';
+  var waveStr=(waveOn&&WAVE[curWeek])?(' · '+l.waveCurL+' '+waveLabel(curWeek)):'';
+  document.getElementById('PROG_NOTE').innerHTML=(lang==='ko'?w.nk:w.ne)+'<br><span style="opacity:.7">'+dowStr+' · '+l.volTierNames[volTier]+waveStr+'</span>';
   var list=document.getElementById('PROG_LIST');list.innerHTML='';
   w.days.forEach(function(_dd,di){
     var dd=dayOf(curWeek,di);
     var d=document.createElement('div');d.className='pdcard';
     var rows=dd.ex.map(function(ex){
       var note=exNote(ex)?'<div class="pexnote">'+exNote(ex)+'</div>':'';
-      var accTag=ex.acc?'<span style="font-size:10px;color:var(--o);"> ('+l.accBadge+')</span>':'';
       var wdisp,reps;
-      if(ex.acc){wdisp=lang==='ko'?'맨몸':'BW';reps=(lang==='ko'?ex.rk:ex.re);}
-      else if(ex.ladder){wdisp=ladderStr(ex);reps=l.ladderReps;}
+      if(ex.ladder){wdisp=ladderStr(ex);reps=l.ladderReps;}
       else{wdisp=calcW(ex)+'kg';reps=baseSets(ex)+'×'+ex.reps+' · '+Math.round(ex.pct*100)+'%';}
-      return '<div class="pexr"><div><span class="pexn">'+exName(ex)+accTag+'</span>'+note+'</div><div class="pexrv">'+reps+'<br><b>'+wdisp+'</b></div></div>';
+      return '<div class="pexr"><div><span class="pexn">'+exName(ex)+'</span>'+note+'</div><div class="pexrv">'+reps+'<br><b>'+wdisp+'</b></div></div>';
     }).join('');
     var dow=wDows[di];
     d.innerHTML='<div class="pdtitle">Day '+(di+1)+(dow!=null?' ('+l.dowNames[dow]+')':'')+' — '+(lang==='ko'?dd.sk:dd.se)+'</div>'+rows;
@@ -1990,7 +2212,7 @@ function goTip(t){
   setTimeout(function(){
     var el=document.getElementById('tip-'+t);
     if(el){
-      el.scrollIntoView({behavior:'smooth',block:'center'});
+      try{if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}
       el.classList.add('tiphl');
       setTimeout(function(){el.classList.remove('tiphl');},2200);
     }
@@ -2042,7 +2264,6 @@ function renderGraph(){
   }
   var canvas=document.getElementById('G_CHART');
   if(typeof Chart==='undefined'){
-    // library still in flight (or blocked): retry shortly, never throw
     if(!renderGraph._retry){renderGraph._retry=1;setTimeout(function(){renderGraph._retry=0;renderGraph();},1200);}
     return;
   }
@@ -2095,10 +2316,12 @@ function collectPrefixedForExport(prefix){
   return out;
 }
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,heavySingles:heavySingles,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,lastPostpone:lastPostpone,dweek:dweek,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,curDay:curDay,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,waveOn:waveOn,heavySingles:heavySingles,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,lastPostpone:lastPostpone,dweek:dweek,dtier:dtier,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  lastExport=todayStr();lset('lastExport',lastExport);
+  renderLastExport();
   toast(L().exported);
 }
 function importData(e){
@@ -2109,16 +2332,19 @@ function importData(e){
       var d=JSON.parse(ev.target.result);
       if(d.prs)prs=d.prs;if(d.logs)logs=d.logs;
       if(d.curWeek!=null)curWeek=Math.min(d.curWeek,11);
+      if(d.curDay!=null)curDay=Math.max(0,Math.min(3,d.curDay));
       if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
       if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
       if(d.volTier&&VOL_TIER_MULT[d.volTier])volTier=d.volTier;
+      if(d.waveOn!=null)waveOn=!!d.waveOn;
       if(d.heavySingles!=null)heavySingles=!!d.heavySingles;
-      if(d.body)bodyMetrics=Object.assign({bw:null,ht:null,sex:'m'},d.body);
+      if(d.body)bodyMetrics={bw:d.body.bw!=null?d.body.bw:null,ht:d.body.ht!=null?d.body.ht:null,sex:d.body.sex==='f'?'f':'m'};
       if(d.autoWeek!=null)autoWeek=!!d.autoWeek;
       if(isValidDateStr(d.cycleStart))cycleStart=d.cycleStart;
       if(isValidDateStr(d.lastPostpone))lastPostpone=d.lastPostpone;
       if(d.dweek)dweek=d.dweek;
-      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('heavySingles',heavySingles);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('lastPostpone',lastPostpone);lset('dweek',dweek);
+      if(d.dtier)dtier=d.dtier;
+      lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('day',curDay);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('waveOn',waveOn);lset('heavySingles',heavySingles);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('lastPostpone',lastPostpone);lset('dweek',dweek);lset('dtier',dtier);
       if(d.extras){Object.keys(d.extras).forEach(function(dateKey){setExtras(dateKey,d.extras[dateKey]);});}
       if(d.madj){Object.keys(d.madj).forEach(function(dateKey){lset('madj_'+dateKey,d.madj[dateKey]);});}
       applyLang();renderHeader();renderToday();renderPRInputs();
@@ -2172,6 +2398,22 @@ function sw(name){
   }catch(e){}
   lset('extraMig1',true);
 })();
+// One-time seed (2026-09-15): current 1RMs, body metrics and the cycle anchor.
+// Stored values normally win over defaults, so without this the numbers would never reach a
+// device that already has data. Guarded by a version key, so it runs exactly once and never
+// overwrites anything the user changes afterwards. Training history is untouched.
+(function seedV2(){
+  if(lget('seedV2',false))return;
+  prs={snatch:80,cleanjerk:105,squat:140,frontsquat:115,press:80};lset('prs',prs);
+  bodyMetrics={bw:78,ht:175,sex:'m'};lset('body',bodyMetrics);
+  volTier='semipro';lset('volTier',volTier);
+  autoWeek=true;lset('autoWeek',true);
+  // Monday 2026-08-03 + 6 weeks => Tue 2026-09-15 falls in week 7, day 2 (Mon/Tue/Thu/Fri).
+  cycleStart='2026-08-03';lset('cycleStart',cycleStart);
+  lastPostpone=null;lset('lastPostpone',null);
+  curWeek=6;lset('week',curWeek);
+  lset('seedV2',true);
+})();
 // Runs at boot, after every state var is initialized: a corrupt stored value used to throw
 // during the first render and leave a permanently blank screen.
 function sanitizeState(){
@@ -2183,10 +2425,13 @@ function sanitizeState(){
   if(!setStates||typeof setStates!=='object'){setStates={};}
   if(!Array.isArray(logs)){logs=[];}
   if(!dweek||typeof dweek!=='object'){dweek={};}
+  if(!dtier||typeof dtier!=='object'){dtier={};}
+  if(typeof waveOn!=='boolean'){waveOn=true;lset('waveOn',true);}
   if(!bodyMetrics||typeof bodyMetrics!=='object'){bodyMetrics={bw:null,ht:null,sex:'m'};}
   if(bodyMetrics.sex!=='m'&&bodyMetrics.sex!=='f')bodyMetrics.sex='m';
   if(cycleStart!=null&&!isValidDateStr(cycleStart)){cycleStart=null;lset('cycleStart',null);}
   if(lastPostpone!=null&&!isValidDateStr(lastPostpone)){lastPostpone=null;lset('lastPostpone',null);}
+  if(lastExport!=null&&!isValidDateStr(lastExport)){lastExport=null;lset('lastExport',null);}
   if(typeof curWeek!=='number'||!isFinite(curWeek)){curWeek=0;lset('week',0);}
   curWeek=Math.max(0,Math.min(11,Math.floor(curWeek)));
   if(typeof curDay!=='number'||!isFinite(curDay))curDay=0;
@@ -2202,11 +2447,7 @@ function bootApp(){
 try{
   bootApp();
 }catch(err){
-  // Last resort: rather than a blank unusable screen, wipe the volatile view-state keys
-  // (never PRs, logs or history) and retry once, then surface a real message if it still fails.
   try{
-    // Step 1: retry in-memory only. Never delete the saved week here - a one-off render
-    // failure must not cost the user their cycle progress.
     lang=LNG[lang]?lang:'ko';
     volTier=VOL_TIER_MULT[volTier]?volTier:'semipro';
     if(!Array.isArray(wDows)||!wDows.length)wDows=[1,2,4,5];
@@ -2229,7 +2470,7 @@ try{
     if(b)b.onclick=function(){
       try{
         Object.keys(localStorage).slice().forEach(function(k){
-          if(k.indexOf('wl2_')===0 && k.indexOf('wl2_logs')!==0 && k.indexOf('wl2_prs')!==0 && k.indexOf('wl2_dweek')!==0){
+          if(k.indexOf('wl2_')===0 && k.indexOf('wl2_logs')!==0 && k.indexOf('wl2_prs')!==0 && k.indexOf('wl2_dweek')!==0 && k.indexOf('wl2_dtier')!==0){
             localStorage.removeItem(k);
           }
         });
