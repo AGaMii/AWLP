@@ -147,6 +147,19 @@ select.pinp{appearance:none;}
 .tiphl{outline:2px solid var(--g);outline-offset:2px;border-radius:8px;}
 .adjb-sm{width:28px!important;height:28px!important;font-size:15px!important;padding:0!important;flex-shrink:0;border:.5px solid var(--bd2)!important;background:var(--sf)!important;color:var(--tx)!important;}
 .exm b{color:var(--tx);font-size:13px;}
+.wg{font-size:12.5px;color:var(--tx);line-height:1.6;margin-bottom:10px;}
+.wg-step{display:flex;gap:8px;padding:6px 0;border-bottom:.5px solid var(--bd);}
+.wg-step:last-child{border-bottom:none;}
+.wg-n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--gl);color:var(--gd);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.wg-t{flex:1;min-width:0;}
+.wg-t b{color:var(--tx);}
+.wg-sub{font-size:11px;color:var(--tx2);}
+.wg-ramp{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px;}
+.wg-ramp span{font-size:11px;background:var(--sf);border-radius:6px;padding:2px 6px;}
+.wg-long{font-size:11px;font-weight:700;color:var(--o);margin-bottom:4px;}
+.missrow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:8px;font-size:11px;color:var(--r);}
+.mchip{font-size:11px;padding:4px 8px;border-radius:12px;border:.5px solid rgba(226,75,74,.45);background:transparent;color:var(--tx2);cursor:pointer;}
+.mchip.on{background:var(--r);color:#fff;border-color:var(--r);}
 .warnbox{background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.65;color:var(--tx);}
 </style>
 </head>
@@ -178,6 +191,7 @@ select.pinp{appearance:none;}
     <div class="card" id="VOL_BANNER" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;"></div>
     <div class="card" id="WARM_SECTION" style="padding:14px;">
       <div class="ct"><i class="ti ti-flame"></i> <span id="WARM_TITLE"></span></div>
+      <div id="WARM_GUIDE"></div>
       <div id="WARM_LIST"></div>
       <button class="ghostb" id="BTN_REPEAT_WARM" onclick="repeatLastExtras('warm')" style="display:none;"></button>
       <button class="ghostb" id="BTN_ADD_WARM" onclick="toggleExtraPicker('warm')"></button>
@@ -346,13 +360,13 @@ select.pinp{appearance:none;}
         </select>
       </div>
     </div>
-    <div class="card">
+    <div class="card" style="display:none;">
       <div class="ct"><i class="ti ti-wave-sine"></i> <span id="S_WAVE"></span></div>
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="WAVE_HINT"></div>
       <div class="ltog" id="WAVE_ROW"></div>
       <div class="dbox" id="WAVE_BOX" style="margin-top:10px;margin-bottom:0;"></div>
     </div>
-    <div class="card">
+    <div class="card" style="display:none;">
       <div class="ct"><i class="ti ti-flame"></i> <span id="S_HEAVY"></span></div>
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;" id="HEAVY_HINT"></div>
       <div class="ltog" id="HEAVY_ROW"></div>
@@ -410,12 +424,16 @@ select.pinp{appearance:none;}
 <div class="toast" id="TOAST"></div>
 <script>
 // ============================================================
-// 12-WEEK ROTATION PROGRAM (Prilepin-based)
-// Block1 (W1-4) technique/volume -> W5 deload
-// Block2 (W6-8) intensity -> W9 squat peak -> W10 singles
-// W11 PR attempt week -> W12 recovery & reset
-// Intensity wave (WAVE) rides on top of the block percentages for the
-// classic lifts only, so squats keep their own across-block progression.
+// 3-DAY HEAVY-SINGLE PROGRAM (v3, 2026-10) — Mon / Wed / Fri
+// 12-week cycle = three 4-week blocks.
+//   Block 1 (W1-3 up, W4 deload) · Block 2 (W5-7 up, W8 deload)
+//   Block 3 (W9-10 up) -> W11 PR attempt week -> W12 recovery & reset
+// Inside a block the heavy single climbs 88% -> 91% -> 94% of the current PR.
+// Mon/Wed: ramp-up, then the heavy single FIRST (hardest lift early in the session),
+//          then low-rep back-off work. Same weight: at most 3 attempts.
+// Fri:     no max attempts - speed, transition / second-pull work, moderate C&J.
+// The old weekly wave and heavy-single primers are retired: intensity now
+// progresses explicitly week to week, so WAVE is all zeros and HEAVY_PLAN is empty.
 // ============================================================
 var DIRECT_KEYS=['snatch','cleanjerk','squat','frontsquat','press'];
 var DEFAULTS={snatch:80,cleanjerk:105,squat:140,frontsquat:115,press:80};
@@ -440,7 +458,6 @@ var EXTRA_LIB=[
  {id:'sotts',ko:'솟츠 프레스',en:'Sotts Press',cat:'warm',sets:2,reps:5,pril:null,nk:'바닥 자세 오버헤드 가동성',ne:'Overhead mobility in the bottom'},
  // ---- 보조·마무리 (본운동 후) ----
  {id:'jumpsq',ko:'점프 스쿼트',en:'Jump Squat',cat:'acc',sets:4,reps:5,pril:null,nk:'가벼운 중량(체중~25%)으로 폭발력',ne:'Light load (~25% BW) for power'},
- {id:'rackjerk',ko:'랙 저크',en:'Rack Jerk',cat:'acc',sets:3,reps:2,pril:null,nk:'클린 없이 저크만 — 락아웃 안정성',ne:'Jerk only, no clean - lockout stability'},
  {id:'pindl',ko:'핀 데드리프트(무릎 위)',en:'Pin Deadlift (above knee)',cat:'acc',sets:3,reps:3,pril:null,nk:'무릎 위 랙에서 시작, 과부하 풀',ne:'Start from pins above knee; overload pull'},
  {id:'pinsq',ko:'핀 스쿼트',en:'Pin Squat',cat:'acc',sets:3,reps:3,pril:null,nk:'바닥 정지 구간 스트렝스',ne:'Dead-stop strength out of the hole'},
  {id:'hrsq',ko:'고반복 백 스쿼트',en:'High-Rep Back Squat',cat:'acc',sets:2,reps:18,pril:null,nk:'가벼운 중량 18~20회, 세트간 60~90초',ne:'Light, 18-20 reps, 60-90s rest'},
@@ -459,97 +476,75 @@ function E(nk,ne,base,pct,reps,sets,rest,tip,log,noK,noE){return{nk:nk,ne:ne,bas
 // PR ladder day (90% -> 95% -> new record)
 function LAD(nk,ne,base){return{nk:nk,ne:ne,base:base,ladder:true,reps:'1',sets:3,rest:240,tip:'prday',log:null};}
 
-var B1=[
- {sk:'인상 기술 & 백 스쿼트',se:'Snatch technique & back squat',ex:[
-   E('스내치','Snatch','snatch',.75,'3',5,150,'lift','snatch'),
-   E('세그먼트 스내치 풀','Segment Snatch Pull','snatch',.75,'3',4,150,'segpull',null,'무릎 위 3초 정지 후 폭발','3s pause above knee, then explode'),
-   E('백 스쿼트','Back Squat','squat',.80,'4',4,210,'squat','squat')]},
- {sk:'용상 기술 & 상체 스트렝스',se:'C&J technique & upper strength',ex:[
-   E('클린 앤 저크','Clean & Jerk','cleanjerk',.80,'2+1',5,180,'lift','cleanjerk','클린 2회 + 저크 1회','2 cleans + 1 jerk'),
-   E('클린 풀','Clean Pull','cleanjerk',.90,'2',4,150,'pull'),
-   E('푸시 프레스','Push Press','press',.75,'4',4,210,'press','press')]},
- {sk:'무릎 위 약점 타격 ★',se:'Above-knee weakness day ★',ex:[
-   E('3-Position 스내치 하이풀 + 스내치','3-Position Snatch High Pull + Snatch','snatch',.65,'3+1',4,180,'3pos','snatch','포켓 → 무릎 위 2초 → 바닥 → 스내치','Pocket, above-knee 2s hold, floor, then snatch'),
-   E('스내치 밸런스','Snatch Balance','snatch',.75,'2',4,150,'balance'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.85,'3',4,210,'squat','frontsquat')]},
- {sk:'파워 용상 & 네거티브',se:'Power C&J & negatives',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'2+2',4,180,'power','powercj'),
-   E('저크 드라이브','Jerk Drive','cleanjerk',.95,'2',3,210,'jerkdrive'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'3',4,150,'ohs','ohs'),
-   E('익센트릭 역도 데드리프트','Eccentric WL Deadlift','cleanjerk',.90,'4',3,150,'eccdl','eccdl','무릎 위 구간 4~5초 버티며 하강','Lower 4-5s through the above-knee zone')]}
-];
+// heavy single: one attempt per set button; add attempts with the set "+" (max 3 at one weight)
+function HS(nk,ne,base,pct,noK,noE){return E(nk,ne,base,pct,'1',1,240,'heavy',base,noK,noE);}
 
+// per-level percentages inside a block (index 0 = first week, 1 = second, 2 = third)
+var LV={
+ hs:[.88,.91,.94],   // heavy single, snatch & C&J
+ snb:[.80,.82,.85],  // snatch back-off 5x2
+ bsq:[.82,.85,.88],  // back squat 4x2
+ cpl:[.95,1.00,1.00],// clean pull 3x2 (heavy, force / RFD)
+ seg:[.80,.83,.85],  // segment clean 2x2
+ jd:[.85,.88,.90],   // jerk drive 3x3
+ fsq:[.80,.83,.85],  // front squat 4x2
+ fsn:[.75,.78,.80],  // Friday snatch 5x2
+ fcj:[.75,.78,.80],  // Friday C&J 4x(1+1)
+ hhp:[.45,.45,.50],  // hang high pull 3x3 (light, speed)
+ jsh:[.45,.45,.50],  // jump shrug 3x3 (light, speed)
+ pp:[.70,.72,.75]    // push press 3x3
+};
+function blockDays(lv){
+  var p=function(k){return LV[k][lv];};
+  return [
+   {sk:'스내치 헤비 & 백 스쿼트',se:'Snatch heavy & back squat',ex:[
+     HS('스내치 — 헤비 싱글','Snatch — heavy single','snatch',p('hs'),
+        '램프업 직후 바로 · 실패 시 같은 무게 최대 3회(세트 + 로 시도 추가) · 무너지면 중단',
+        'Right after the ramp-up · on a miss, max 3 tries at this weight (add with set +) · stop on a breakdown'),
+     E('스내치 (백오프)','Snatch (back-off)','snatch',p('snb'),'2',5,180,'lift',null,
+        '실패해도 무게를 내려 횟수를 쌓지 않기','After a miss, do not drop weight to pile up reps'),
+     E('백 스쿼트','Back Squat','squat',p('bsq'),'2',4,210,'squat','squat',
+        '허리가 말리면 그 세트 중단 — 버텨 올리지 않기','Stop the set if the lower back rounds - never grind through it'),
+     E('클린 풀 (고중량)','Clean Pull (heavy)','cleanjerk',p('cpl'),'2',3,150,'pull',null,
+        '무릎을 지나 미드타이에서 최대 가속 · 캐치 없음 (힘·힘 발달률)','Max acceleration from mid-thigh after the knee · no catch (force / RFD)')]},
+   {sk:'C&J 헤비 & 전환 구간',se:'C&J heavy & transition',ex:[
+     HS('클린 앤 저크 — 헤비 싱글','Clean & Jerk — heavy single','cleanjerk',p('hs'),
+        '클린+저크 한 번에 · 오른팔·어깨 통증 시 즉시 중단 · 같은 무게 최대 3회',
+        'Clean + jerk together · stop at once on right arm/shoulder pain · max 3 tries at one weight'),
+     E('세그먼트 클린','Segment Clean','cleanjerk',p('seg'),'2',2,180,'segclean',null,
+        '무릎 아래 · 무릎에서 각 1~2초 정지 → 클린 (저크 없음)','1-2s pauses below the knee and at the knee, then clean (no jerk)'),
+     E('저크 드라이브','Jerk Drive','cleanjerk',p('jd'),'3',3,180,'jerkdrive',null,
+        '딥·드라이브만, 락아웃 없음 · 팔 통증 없는 범위에서만','Dip & drive only, no lockout · only while the arm is pain-free'),
+     E('프론트 스쿼트','Front Squat','frontsquat',p('fsq'),'2',4,210,'squat','frontsquat',
+        '클린에서 일어서는 힘','Strength for standing up the clean')]},
+   {sk:'속도 · 세컨풀 (최대 시도 없음)',se:'Speed · second pull (no max attempts)',ex:[
+     E('스내치','Snatch','snatch',p('fsn'),'2',5,150,'lift',null,
+        '바 속도 위주 · 최대 시도 없음','Bar speed first · no max attempts'),
+     E('행 하이 풀','Hang High Pull','cleanjerk',p('hhp'),'3',3,120,'hhp',null,
+        '무릎 위로 내렸다가 미드타이로 전환 후 폭발 · 바 속도가 떨어지면 무게 내리기',
+        'Lower to above the knee, shift to mid-thigh, explode · drop weight if bar speed fades'),
+     E('점프 슈러그','Jump Shrug','cleanjerk',p('jsh'),'3',3,120,'jshrug',null,
+        '미드타이에서 점프+슈러그 · 부드럽게 착지, 무릎 통증 시 중단','Jump + shrug from mid-thigh · land softly, stop on knee pain'),
+     E('클린 앤 저크','Clean & Jerk','cleanjerk',p('fcj'),'1+1',4,150,'lift',null,
+        '팔 상태에 따라 세트 줄이기','Cut sets depending on the arm'),
+     E('푸시 프레스','Push Press','press',p('pp'),'3',3,150,'press','press',
+        '가볍게 · 오른팔 통증 시 생략','Light · skip on right-arm pain')]}
+  ];
+}
+var BK0=blockDays(0),BK1=blockDays(1),BK2=blockDays(2);
+
+// deload: ~40% less volume, nothing above 85%
 var DL=[
- {sk:'디로딩 · 인상',se:'Deload · snatch',ex:[
-   E('스내치','Snatch','snatch',.60,'3',3,150,'lift','snatch'),
-   E('세그먼트 스내치 풀','Segment Snatch Pull','snatch',.60,'2',3,120,'segpull'),
-   E('백 스쿼트','Back Squat','squat',.70,'3',3,180,'squat','squat')]},
- {sk:'디로딩 · 용상',se:'Deload · C&J',ex:[
-   E('클린 앤 저크','Clean & Jerk','cleanjerk',.60,'1+1',3,150,'lift','cleanjerk'),
-   E('클린 풀','Clean Pull','cleanjerk',.70,'2',3,120,'pull'),
-   E('푸시 프레스','Push Press','press',.60,'3',3,150,'press','press')]},
- {sk:'디로딩 · 포지션',se:'Deload · position',ex:[
-   E('3-Position 스내치 하이풀 + 스내치','3-Position Snatch High Pull + Snatch','snatch',.55,'3+1',3,150,'3pos'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.70,'3',3,180,'squat','frontsquat')]},
- {sk:'디로딩 · 파워',se:'Deload · power',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.60,'1+1',3,150,'power','powercj'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.55,'2',3,120,'ohs','ohs')]}
-];
-
-var B2=[
- {sk:'인상 강도 상향',se:'Snatch intensity up',ex:[
-   E('스내치','Snatch','snatch',.80,'2',6,180,'lift','snatch'),
-   E('스내치 풀','Snatch Pull','snatch',.90,'2',4,150,'pull'),
-   E('백 스쿼트','Back Squat','squat',.85,'3',4,210,'squat','squat')]},
- {sk:'용상 강도 상향 & 저크',se:'C&J intensity up & jerk',ex:[
-   E('클린 앤 저크','Clean & Jerk','cleanjerk',.85,'1+1',5,180,'lift','cleanjerk'),
-   E('클린 풀','Clean Pull','cleanjerk',1.00,'2',3,180,'pull',null,'무겁게 뽑는 연습','Heavy pulling practice'),
-   E('랙 저크','Rack Jerk','cleanjerk',.85,'2',3,180,'rackjerk',null,'클린 없이 저크만 — 락아웃 전용','Jerk only from the rack - lockout work'),
-   E('푸시 프레스','Push Press','press',.80,'3',4,210,'press','press')]},
- {sk:'포지션 스내치 & 프론트',se:'Position snatch & front squat',ex:[
-   E('스내치','Snatch','snatch',.75,'3',5,150,'lift','snatch','강해진 포지션으로 바닥에서 정식 수행','Full lift from the floor with the improved position'),
-   E('스내치 밸런스','Snatch Balance','snatch',.80,'2',3,150,'balance'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.90,'2',4,210,'squat','frontsquat')]},
- {sk:'파워 & 오버헤드',se:'Power & overhead',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.80,'1+1',5,180,'power','powercj'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.80,'2',4,150,'ohs','ohs')]}
-];
-
-var W9=[
- {sk:'인상 & 백 스쿼트 피크',se:'Snatch & back squat peak',ex:[
-   E('스내치','Snatch','snatch',.80,'2',5,180,'lift','snatch'),
-   E('스내치 풀','Snatch Pull','snatch',.90,'2',3,150,'pull'),
-   E('백 스쿼트','Back Squat','squat',.90,'2',3,240,'squat','squat','스쿼트 최고 중량 주간','Squat peak week')]},
- {sk:'용상 유지 & 저크',se:'C&J maintain & jerk',ex:[
-   E('클린 앤 저크','Clean & Jerk','cleanjerk',.80,'1+1',4,180,'lift','cleanjerk'),
-   E('클린 풀','Clean Pull','cleanjerk',.95,'2',3,180,'pull'),
-   E('랙 저크','Rack Jerk','cleanjerk',.875,'2',3,180,'rackjerk'),
-   E('푸시 프레스','Push Press','press',.75,'2',3,180,'press','press')]},
- {sk:'프론트 스쿼트 피크',se:'Front squat peak',ex:[
-   E('스내치','Snatch','snatch',.75,'2',4,150,'lift'),
-   E('스내치 밸런스','Snatch Balance','snatch',.75,'2',3,150,'balance'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.95,'2',2,240,'squat','frontsquat')]},
- {sk:'파워 유지',se:'Power maintain',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.75,'1+1',4,180,'power','powercj'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.75,'2',3,150,'ohs','ohs')]}
-];
-
-var W10=[
- {sk:'스내치 싱글 적응',se:'Snatch heavy singles',ex:[
-   E('스내치','Snatch','snatch',.90,'1',4,240,'lift','snatch','90% 싱글 적응','Adapt to 90% singles'),
-   E('스내치 풀','Snatch Pull','snatch',.95,'1',3,180,'pull'),
-   E('백 스쿼트','Back Squat','squat',.80,'2',3,210,'squat','squat')]},
- {sk:'C&J 싱글 적응',se:'C&J heavy singles',ex:[
-   E('클린 앤 저크','Clean & Jerk','cleanjerk',.90,'1+1',4,240,'lift','cleanjerk','90% 싱글 적응','Adapt to 90% singles'),
-   E('클린 풀','Clean Pull','cleanjerk',.90,'1',3,150,'pull'),
-   E('랙 저크','Rack Jerk','cleanjerk',.90,'1',2,210,'rackjerk',null,'싱글로 락아웃 확인','Singles to confirm lockout'),
-   E('푸시 프레스','Push Press','press',.70,'2',3,150,'press','press')]},
- {sk:'가볍게 유지',se:'Light maintain',ex:[
-   E('스내치','Snatch','snatch',.80,'1',5,180,'lift'),
-   E('프론트 스쿼트','Front Squat','frontsquat',.85,'2',3,210,'squat','frontsquat')]},
- {sk:'가볍게 유지',se:'Light maintain',ex:[
-   E('파워 클린 + 파워 저크','Power Clean + Power Jerk','cleanjerk',.70,'1+1',3,150,'power','powercj'),
-   E('오버헤드 스쿼트','Overhead Squat','snatch',.70,'2',3,120,'ohs','ohs')]}
+ {sk:'디로드 · 스내치',se:'Deload · snatch',ex:[
+   E('스내치','Snatch','snatch',.70,'2',3,150,'lift',null),
+   E('백 스쿼트','Back Squat','squat',.70,'2',3,180,'squat',null)]},
+ {sk:'디로드 · C&J',se:'Deload · C&J',ex:[
+   E('클린 앤 저크','Clean & Jerk','cleanjerk',.70,'1+1',3,150,'lift',null),
+   E('세그먼트 클린','Segment Clean','cleanjerk',.65,'2',2,150,'segclean',null),
+   E('프론트 스쿼트','Front Squat','frontsquat',.70,'2',3,180,'squat',null)]},
+ {sk:'디로드 · 속도',se:'Deload · speed',ex:[
+   E('파워 스내치','Power Snatch','snatch',.65,'2',3,120,'power','powersn'),
+   E('행 하이 풀','Hang High Pull','cleanjerk',.40,'3',2,120,'hhp',null)]}
 ];
 
 var W11=[
@@ -560,9 +555,8 @@ var W11=[
    LAD('클린 앤 저크 — 신기록 도전','Clean & Jerk — new PR attempt','cleanjerk'),
    E('프론트 스쿼트','Front Squat','frontsquat',.65,'2',2,150,'squat')]},
  {sk:'회복',se:'Recovery',ex:[
-   E('파워 스내치','Power Snatch','snatch',.65,'2',3,120,'power','powersn')]},
- {sk:'회복',se:'Recovery',ex:[
-   E('파워 클린','Power Clean','cleanjerk',.65,'2',3,120,'power','powercj')]}
+   E('파워 스내치','Power Snatch','snatch',.60,'2',3,120,'power','powersn'),
+   E('파워 클린','Power Clean','cleanjerk',.60,'2',3,120,'power','powercj')]}
 ];
 
 var W12=[
@@ -571,47 +565,41 @@ var W12=[
    E('백 스쿼트','Back Squat','squat',.60,'3',3,150,'squat')]},
  {sk:'회복 & 리셋',se:'Recovery & reset',ex:[
    E('클린 앤 저크','Clean & Jerk','cleanjerk',.60,'1+1',3,120,'lift'),
-   E('푸시 프레스','Push Press','press',.60,'3',3,120,'press')]},
- {sk:'회복 & 리셋',se:'Recovery & reset',ex:[
-   E('파워 스내치','Power Snatch','snatch',.55,'2',3,120,'power','powersn')]},
+   E('프론트 스쿼트','Front Squat','frontsquat',.60,'3',3,150,'squat')]},
  {sk:'회복 & 리셋',se:'Recovery & reset',ex:[
    E('파워 클린','Power Clean','cleanjerk',.55,'2',3,120,'power','powercj',null,'새 PR을 설정 탭에 저장하고 1주차부터 재시작','Save new PRs in Settings, then restart at Week 1')]}
 ];
 
-// Intensity wave, applied to the classic lifts only (base snatch / cleanjerk).
-// Block 1: 3 weeks up, 4th slightly unloaded into the week-5 deload.
-// Block 2: 3 weeks up into the week-9 squat peak. Peak/PR weeks carry no wave.
-var WAVE=[0,.025,.05,.025,0,0,.025,.05,0,0,0,0];
+// Retired: intensity now progresses explicitly inside each block.
+var WAVE=[0,0,0,0,0,0,0,0,0,0,0,0];
 
-var NOTE_B1_K='블록 1 (1~4주) — 무릎 위 약점을 인지하고, 프릴레핀 최적 볼륨으로 바벨 스피드를 극대화하는 기술 축적 구간. 주종목 강도는 1→3주 상승, 4주는 디로딩 직전 소폭 언로딩. 자세가 무너지면 그 세트는 즉시 종료하세요.';
-var NOTE_B1_E='Block 1 (W1-4) - technique accumulation. Fix the above-knee weakness and maximize bar speed at Prilepin-optimal volume. Classic-lift intensity rises W1-3 and unloads slightly in W4 before the deload. End the set the moment technique breaks.';
-var NOTE_DL_K='디로딩 주간 — CNS와 관절을 회복하는 주간입니다. 쉬는 주가 아니라 60~70%로 가볍게 움직여 몸을 리셋하는 주입니다.';
-var NOTE_DL_E='Deload week - reset the CNS and joints. Not a week off: move light at 60-70%.';
-var NOTE_B2_K='블록 2 (6~8주) — 강도를 5%p 상향하고 주 단위로 다시 파동을 태워 실전 중량 적응력을 높이는 구간. 랙 저크로 저크 락아웃을 따로 쌓습니다. 바벨 속도가 급격히 느려지는 중량은 피하세요.';
-var NOTE_B2_E='Block 2 (W6-8) - intensity up 5%p with a weekly wave on top, building heavy-weight tolerance. Rack jerks add dedicated lockout work. Avoid loads where bar speed collapses.';
-var NOTE_W9_K='9주 — 스쿼트 피크. 백/프론트 스쿼트를 사이클 최고 중량으로 올립니다. 세트 사이 3~4분 충분히 쉬세요.';
-var NOTE_W9_E='W9 - squat peak. Back/front squat at cycle-max loads. Rest a full 3-4 minutes.';
-var NOTE_W10_K='10주 — 싱글 적응. 메인 리프트 90% 싱글로 무거운 무게 감각을 만듭니다. 세트당 1회, 완벽한 자세로.';
-var NOTE_W10_E='W10 - heavy singles. Build feel for 90% loads. One perfect rep per set.';
+var NOTE_BK_K='4주 블록 — 헤비 싱글 1주 88% → 2주 91% → 3주 94% → 4주 디로드. 월·수는 램프업 직후 헤비 싱글을 먼저 하고, 금요일은 최대 시도 없이 속도·전환 구간만 다룹니다. 같은 무게 실패는 최대 3회까지, 실패 후 무게를 내려 횟수를 쌓지 않습니다. 실패하면 세트를 한 번 더 탭해 빨간색으로 두고 실패 지점을 고르세요.';
+var NOTE_BK_E='4-week block - heavy single 88% → 91% → 94%, then a deload. Mon/Wed: heavy single first, right after the ramp-up. Friday has no max attempts - speed and transition work only. Max 3 tries at one weight, and never drop the weight to pile up reps after a miss. On a miss, tap the set again (red) and pick where it failed.';
+var NOTE_DL_K='디로드 — 볼륨 약 40%↓, 85% 이하. 쉬는 주가 아니라 가볍게 움직여 회복하는 주입니다. 블록 사이 PR이 바뀌었다면 설정 탭에서 갱신하세요.';
+var NOTE_DL_E='Deload - about 40% less volume, nothing above 85%. Not a week off: move light and recover. If your PRs changed during the block, update them in Settings.';
+var NOTE_B3_K='블록 3 — 2주 올린 뒤 11주차에 기록 도전. 이 블록은 헤비 싱글을 무리해서 올리지 말고 성공률을 지키세요.';
+var NOTE_B3_E='Block 3 - two weeks up, then the PR attempt in week 11. Protect your make rate here rather than forcing the heavy single.';
 var NOTE_W11_K='11주 — 기록 도전 주간 🏆 90% → 95% → 신기록 순서로 시도하세요. 성공하면 그래프 탭에 새 기록을 입력하면 PR이 자동 갱신됩니다.';
 var NOTE_W11_E='W11 - PR week 🏆 Attempt 90% then 95% then a new record. Log a successful lift in the Graph tab and your PR updates automatically.';
 var NOTE_W12_K='12주 — 회복 & 리셋. 사이클 종료 후 설정 탭에서 새 PR을 저장하고 1주차부터 새 사이클을 시작하세요.';
 var NOTE_W12_E='W12 - recovery & reset. Save your new PRs in Settings and restart the cycle at Week 1.';
 
 var WEEKS=[
- {lk:'1주 · 기술',le:'W1 Tech',nk:NOTE_B1_K,ne:NOTE_B1_E,days:B1},
- {lk:'2주 · 기술',le:'W2 Tech',nk:NOTE_B1_K,ne:NOTE_B1_E,days:B1},
- {lk:'3주 · 기술',le:'W3 Tech',nk:NOTE_B1_K,ne:NOTE_B1_E,days:B1},
- {lk:'4주 · 기술',le:'W4 Tech',nk:NOTE_B1_K,ne:NOTE_B1_E,days:B1},
- {lk:'5주 · 디로딩',le:'W5 Deload',nk:NOTE_DL_K,ne:NOTE_DL_E,days:DL},
- {lk:'6주 · 강도',le:'W6 Intensity',nk:NOTE_B2_K,ne:NOTE_B2_E,days:B2},
- {lk:'7주 · 강도',le:'W7 Intensity',nk:NOTE_B2_K,ne:NOTE_B2_E,days:B2},
- {lk:'8주 · 강도',le:'W8 Intensity',nk:NOTE_B2_K,ne:NOTE_B2_E,days:B2},
- {lk:'9주 · 스쿼트 피크',le:'W9 Squat Peak',nk:NOTE_W9_K,ne:NOTE_W9_E,days:W9},
- {lk:'10주 · 싱글',le:'W10 Singles',nk:NOTE_W10_K,ne:NOTE_W10_E,days:W10},
+ {lk:'1주 · 블록1 88%',le:'W1 · B1 88%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK0},
+ {lk:'2주 · 블록1 91%',le:'W2 · B1 91%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK1},
+ {lk:'3주 · 블록1 94%',le:'W3 · B1 94%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK2},
+ {lk:'4주 · 디로드',le:'W4 Deload',nk:NOTE_DL_K,ne:NOTE_DL_E,days:DL},
+ {lk:'5주 · 블록2 88%',le:'W5 · B2 88%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK0},
+ {lk:'6주 · 블록2 91%',le:'W6 · B2 91%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK1},
+ {lk:'7주 · 블록2 94%',le:'W7 · B2 94%',nk:NOTE_BK_K,ne:NOTE_BK_E,days:BK2},
+ {lk:'8주 · 디로드',le:'W8 Deload',nk:NOTE_DL_K,ne:NOTE_DL_E,days:DL},
+ {lk:'9주 · 블록3 88%',le:'W9 · B3 88%',nk:NOTE_B3_K,ne:NOTE_B3_E,days:BK0},
+ {lk:'10주 · 블록3 91%',le:'W10 · B3 91%',nk:NOTE_B3_K,ne:NOTE_B3_E,days:BK1},
  {lk:'11주 · 기록 도전 🏆',le:'W11 PR Week 🏆',nk:NOTE_W11_K,ne:NOTE_W11_E,days:W11},
  {lk:'12주 · 회복',le:'W12 Recovery',nk:NOTE_W12_K,ne:NOTE_W12_E,days:W12}
 ];
+// number of training days per week in this program (Mon / Wed / Fri)
+var DAYS_N=WEEKS[0].days.length;
 // ===== TIPS DATA =====
 var TIPS=[
  {icon:'ti-bulb',tk:'핵심 큐잉 2가지',te:'Two key cues',items:[
@@ -642,8 +630,8 @@ var TIPS=[
     dk:'랙에서 바벨을 받아 <b>클린 없이 저크만</b> 수행합니다. C&J에서는 클린 피로 때문에 저크를 충분히 연습할 수 없는데, 이 운동이 그 공백을 메웁니다. 딥은 짧고 수직으로, 발은 빠르게 스플릿, <b>앞발 정강이는 수직·뒷무릎은 살짝 굽힘</b>, 바벨은 귀 뒤에서 락아웃합니다. 락아웃이 흔들리면 그 세트에서 중량을 올리지 마세요.',
     de:'Take the bar from the rack and <b>jerk only, no clean</b>. In the full C&J, clean fatigue limits jerk practice; this fills that gap. Short vertical dip, fast split, front shin vertical, back knee slightly bent, and lock the bar behind the ears. If the lockout wavers, do not add weight on that set.'},
    {id:'jerkdrive',tk:'저크 드라이브',te:'Jerk Drive',
-    dk:'C&J 95% 수준의 무거운 중량으로 <b>딥 & 드라이브만</b> 수행합니다. 락아웃 없이, 무거운 무게를 하체 반동으로 받아 튕겨 올리는 감각을 익히는 훈련입니다. 딥은 짧고 수직으로.',
-    de:'Dip and drive only, at ~95% of your C&J - no lockout. Builds the leg-drive feel for heavy weights. Keep the dip short and vertical.'},
+    dk:'C&J 85~90% 중량으로 <b>딥 & 드라이브만</b> 수행합니다. 락아웃 없이, 무거운 무게를 하체 반동으로 받아 튕겨 올리는 감각을 익히는 훈련입니다. 딥은 짧고 수직으로.',
+    de:'Dip and drive only, at 85-90% of your C&J - no lockout. Only while the right arm is pain-free. Builds the leg-drive feel for heavy weights. Keep the dip short and vertical.'},
    {id:'eccdl',tk:'익센트릭 역도 데드리프트',te:'Eccentric WL Deadlift',
     dk:'역도 자세로 뽑아 일어선 후, 내려갈 때 <b>무릎 위 구간에서만 4~5초 극도로 천천히</b> 바벨을 허벅지에 쓸면서 하강합니다. 바벨이 몸에서 멀어지려는 원심력을 등(광배)으로 버텨내는 네거티브 훈련으로, 무릎 위 유지력이 비약적으로 좋아집니다.',
     de:'Stand up with weightlifting start mechanics, then lower <b>4-5 seconds through the above-knee zone only</b>, sweeping the bar down the thigh. The negative teaches the lats to resist the bar drifting away.'},
@@ -661,7 +649,24 @@ var TIPS=[
     de:'Short vertical dip, drive with the legs, press to lockout. Builds jerk drive power and overhead strength.'},
    {id:'prday',tk:'🏆 기록 도전일 진행법',te:'🏆 PR attempt day',
     dk:'충분히 워밍업 후 <b>90% × 1회 → 95% × 1회 → 신기록 시도</b> 순서로 진행합니다. 시도 사이 3~4분 이상 쉬고, 실패해도 최대 1회만 재시도하세요. 성공하면 <b>그래프 탭에 새 기록을 입력</b>하면 PR이 자동 갱신되고, 다음 사이클 중량이 새 기준으로 계산됩니다.',
-    de:'After a full warm-up: 90% x1, then 95% x1, then a new-record attempt. Rest 3-4+ minutes between attempts; retry a miss once at most. Log a successful lift in the Graph tab - the PR updates automatically and the next cycle recalculates from it.'}
+    de:'After a full warm-up: 90% x1, then 95% x1, then a new-record attempt. Rest 3-4+ minutes between attempts; retry a miss once at most. Log a successful lift in the Graph tab - the PR updates automatically and the next cycle recalculates from it.'},
+   {id:'segclean',tk:'세그먼트 클린 (전환 구간 훈련)',te:'Segment Clean (transition work)',
+    dk:'바닥에서 뽑아 <b>무릎 아래 → 무릎</b>에서 각각 1~2초 정지한 뒤 클린으로 마무리합니다(저크 없음). 정지 때 발 전체 균형, 어깨는 바보다 살짝 앞, 광배로 바를 몸에 붙이세요. <b>정지 자세를 못 버티면 힘 문제</b>, 버티는데 전환에서 무너지면 타이밍 문제일 가능성이 큽니다(측면 영상으로 확인).',
+    de:'Pull from the floor and <b>pause 1-2s below the knee, then at the knee</b>, then finish the clean (no jerk). Balanced over the whole foot, shoulders slightly over the bar, lats keeping it close. <b>If you cannot hold the pauses, it is strength</b>; if you hold them but fall apart in the transition, it is more likely timing (check a side-on video).'},
+   {id:'hhp',tk:'행 하이 풀 (카운터무브먼트)',te:'Hang High Pull (countermovement)',
+    dk:'서서 시작해 바를 <b>무릎 위로 내렸다가</b>(카운터무브먼트) 무릎을 다시 밀어 넣으며 미드타이로 전환, 폭발적으로 뻗고 팔꿈치를 높게 당깁니다. 캐치가 없어 팔 부담이 적습니다. 가벼운 무게로 <b>바 속도</b>가 목적 — 속도가 떨어지면 무게를 내리세요.',
+    de:'Start standing, <b>lower the bar to above the knee</b> (countermovement), shift the knees back under into mid-thigh, extend violently and pull the elbows high. No catch, so little arm stress. Light loads for <b>bar speed</b> - drop the weight if speed fades.'},
+   {id:'jshrug',tk:'점프 슈러그',te:'Jump Shrug',
+    dk:'미드타이에서 시작해 <b>점프하며 슈러그</b>합니다. 연구에서 행 클린·하이풀보다 파워와 속도가 높게 나온 세컨풀 속도용 운동입니다. 착지 충격이 있으니 부드럽게 착지하고 무릎 통증이 생기면 중단하세요.',
+    de:'From mid-thigh, <b>jump and shrug</b>. In research it produced more power and velocity than hang cleans and high pulls - a second-pull speed drill. Landing loads are real: land softly and stop on knee pain.'}
+ ]},
+ {icon:'ti-flame',tk:'웜업 · 실패 기록',te:'Warm-up · miss log',items:[
+   {id:'warmup',tk:'웜업 순서 (오늘 탭에 자동 표시)',te:'Warm-up order (shown on the Today tab)',
+    dk:'① <b>체온 올리기</b> 5~8분 → ② <b>천천히 조절된 동적 가동범위</b>(반동 X) → ③ 빈 봉 기술 → ④ <b>바벨 램프업</b>. 근육 온도를 올리는 활동이면 스트레칭·폼롤링만큼 가동범위가 늘고, 정적 스트레칭은 힘·파워를 낮출 수 있어 역도 전에는 넣지 않습니다. 휴식 다음 날(Day 1)은 체온 단계와 램프업을 한 단계씩 더 길게 잡습니다. 램프업 %와 단계 수는 근거로 확정된 값이 아니라 제안값입니다.',
+    de:'1) <b>Raise temperature</b> 5-8 min → 2) <b>slow, controlled dynamic mobility</b> (no bouncing) → 3) empty-bar technique → 4) <b>barbell ramp-up</b>. Any activity that raises muscle temperature improves range of motion about as much as stretching or foam rolling, and static stretching can reduce force/power, so it stays out before lifting. After rest days (Day 1) the temperature step and ramp-up run one step longer. Ramp-up percentages and step counts are suggestions, not evidence-fixed values.'},
+   {id:'miss',tk:'실패 지점 기록',te:'Logging where a lift failed',
+    dk:'세트를 두 번 탭해 빨간색(실패)으로 만들면 그 아래에 실패 지점 버튼이 나옵니다 — <b>첫 풀 / 전환·세컨풀 / 캐치 / 일어서기 / 저크 드라이브 / 저크 캐치·고정</b>. 프로그램 탭 맨 위에 최근 4주 집계가 표시되어, 어디서 무너지는지(힘인지 기술·피로인지) 다음 블록 설계에 씁니다.',
+    de:'Tap a set twice to mark it red (failed) and buttons appear below it - <b>first pull / transition-2nd pull / catch / stand-up / jerk drive / jerk catch-lockout</b>. The Program tab shows a 4-week summary at the top, so the next block can target where you actually break down.'}
  ]},
  {icon:'ti-clock',tk:'세트 사이 휴식 시간',te:'Rest between sets',items:[
    {id:null,tk:'역도 기술 동작 (스내치, C&J, 풀 계열)',te:'Technical lifts (snatch, C&J, pulls)',
@@ -675,18 +680,18 @@ var TIPS=[
     de:'<b>1 to 1.5 min.</b>'}
  ]},
  {icon:'ti-list-check',tk:'프로그램 진행 규칙',te:'Program rules',items:[
-   {id:'wave',tk:'주차별 강도 파동',te:'Weekly intensity wave',
-    dk:'같은 블록 안에서도 주종목(스내치·C&J 계열) 강도가 주마다 <b>0 → +2.5% → +5% → +2.5%</b>로 움직입니다. 4주 내내 같은 중량을 반복하면 적응이 멈추기 때문입니다. 스쿼트·프레스에는 파동을 걸지 않습니다 — 스쿼트는 블록을 넘어가며 이미 80 → 85 → 90 → 95%로 올라가기 때문입니다. 설정 탭에서 끄면 원래의 고정 강도로 돌아갑니다.',
-    de:'Inside a block the classic lifts (snatch / C&J family) move <b>0 → +2.5% → +5% → +2.5%</b> week to week, because repeating one load for four weeks stalls adaptation. Squats and presses get no wave - they already climb 80 → 85 → 90 → 95% across blocks. Turn it off in Settings to run the original flat percentages.'},
-   {id:null,tk:'자세가 무너지면 즉시 중단',te:'Stop when technique breaks',
-    dk:'프릴레핀 차트는 완벽한 자세를 전제로 합니다. 피로로 자세가 흔들리면 반복수를 줄이거나 중량을 낮추세요. 3세트째부터 자세가 깨진다면 다음 주 중량을 2~3kg 낮춥니다.',
-    de:'Prilepin assumes perfect technique. If form degrades from fatigue, cut reps or load. If it breaks by set 3, drop 2-3kg next week.'},
+   {id:'heavy',tk:'헤비 싱글 진행 규칙',te:'Heavy-single rules',
+    dk:'월·수는 램프업 직후 <b>헤비 싱글을 세션 맨 앞에</b> 둡니다(블록 안에서 88% → 91% → 94%). 실패하면 같은 무게로 <b>최대 3회</b>까지 — 세트 + 버튼으로 시도를 추가하고, 성공하면 다음 운동으로 넘어가세요. 실패 후 무게를 내려 횟수를 쌓지 않습니다. 같은 무게가 평소보다 무겁게 느껴지면(주관적 강도↑) 피로 신호로 보고 그날은 무게를 올리지 마세요. 헤비 싱글은 프릴레핀 집계에서 제외됩니다.',
+    de:'On Mon/Wed the <b>heavy single comes first</b>, right after the ramp-up (88% → 91% → 94% inside a block). On a miss, retry the same weight <b>at most 3 times</b> - add an attempt with the set + button, and move on once you make it. Never drop the weight to pile up reps after a miss. If a familiar weight feels heavier than usual, treat it as fatigue and do not go up that day. Heavy singles are excluded from the Prilepin count.'},
+   {id:null,tk:'무너질 때 멈추는 기준',te:'When to stop',
+    dk:'스내치·C&J는 동작이 어긋나면 대부분 바를 놓치는 미스로 끝나므로, 컨디션이 될 때 고중량 시도는 허용합니다. 대신 <b>백·프론트 스쿼트와 풀</b>은 허리가 끝까지 말린 채 버텨 올리지 않습니다 — 그 세트는 중단. 오른팔·어깨 통증이 생기면 오버헤드 동작은 그날 중단하고, 통증이 계속되면 진단을 먼저 받으세요.',
+    de:'Snatch and C&J mostly end in a dropped bar when things go wrong, so heavy attempts are fine on good days. <b>Squats and pulls</b> are different: never grind through with the lower back fully rounded - end that set. If the right arm/shoulder hurts, stop overhead work for the day, and get it checked if the pain persists.'},
    {id:null,tk:'프릴레핀은 종목별로 센다',te:'Prilepin counts per exercise',
     dk:'프릴레핀 차트의 총 반복수는 <b>한 종목 기준</b>입니다. 그래서 이 앱도 스내치·C&J 같은 경기 종목을 <b>각각 따로</b> 판정합니다. 풀·저크드라이브·랙저크·OHS 같은 보조 동작과 스쿼트는 1RM 기준 자체가 달라서 제외되고, 고강도 싱글 보강도 의도적인 소량 자극이라 집계하지 않습니다.',
     de:'Prilepin totals are <b>per exercise</b>, so the app judges each competition lift on its own. Pulls, jerk drives, rack jerks, OHS and squats sit on a different 1RM basis and are excluded, as are the heavy-single primers.'},
-   {id:null,tk:'억지 1RM 측정 금지',te:'No forced monthly maxes',
-    dk:'매달 1RM을 억지로 재면 CNS가 고갈되어 슬럼프가 옵니다. 이 프로그램은 8주간 볼륨과 스피드를 쌓고 <b>11주차에 자연스럽게 기록을 경신</b>하도록 설계되어 있습니다.',
-    de:'Forcing a max every month drains the CNS. This program builds volume and speed for 8 weeks so the record comes naturally in Week 11.'},
+   {id:null,tk:'기록 도전은 11주차',te:'PR attempts in Week 11',
+    dk:'매주 헤비 싱글로 무거운 무게 감각은 유지하되, 신기록 시도는 <b>11주차 기록 도전 주간</b>에 합니다. 블록 사이 PR이 바뀌면 설정 탭에서 갱신하세요.',
+    de:'Weekly heavy singles keep you familiar with heavy loads, but new-record attempts wait for the <b>Week 11 PR week</b>. Update PRs in Settings between blocks if they change.'},
    {id:null,tk:'훈련 기록은 매 세션 저장',te:'Save every session to the graph',
     dk:'오늘 탭에서 세트를 완료하고 <b>[훈련 기록 그래프로 저장]</b> 버튼을 누르면 그날의 작업 중량이 그래프에 쌓입니다. 주가 지날수록 상승하는 곡선으로 향상도를 확인하세요.',
     de:'After finishing your sets, tap <b>Save session to graph</b> in the Today tab. Your working weights accumulate on the chart so you can watch the trend rise week by week.'},
@@ -761,7 +766,7 @@ var LNG={
   newCycleDone:'새 사이클 1주차로 시작했어요 — 설정 탭에서 새 PR을 확인하세요',
   postponeBlocked:'이미 이번 주를 미뤘어요. {n}일 후에 다시 미룰 수 있어요.',
   postponed:'한 주 미뤘어요',advanced:'주차 이동',
-  sDow:'운동 요일 설정 (최대 4일)',btnSaveDow:'요일 저장',
+  sDow:'운동 요일 설정 (3일 · 월수금 권장)',btnSaveDow:'요일 저장',
   dowNames:['일','월','화','수','목','금','토'],
   sData:'데이터 관리',btnExp:'JSON으로 내보내기',btnImp:'JSON 불러오기',btnResetAll:'전체 세트 초기화',
   lastExportL:'마지막 백업',neverExported:'아직 없음 — 주 1회 백업을 권장해요',
@@ -778,13 +783,15 @@ var LNG={
   dotTip:'점을 탭해서 세트 상태 변경',
   newPR:'새 PR!',logAdded:'기록 추가됨',saved:'저장 완료!',
   dowSaved:'요일 저장 완료!',exported:'내보내기 완료',imported:'불러오기 완료!',importErr:'파일 형식 오류',
-  maxDow:'최대 4일까지 선택 가능해요',minDow:'최소 1일은 선택해야 해요',
+  maxDow:'정확히 3일을 골라야 해요',minDow:'최소 1일은 선택해야 해요',
   drvTitle:'파생 중량 자동 계산 (현재 입력값 기준)',
   btnSaveDay:'📈 훈련 기록 그래프로 저장',savedDay:'개 종목 기록 저장됨',savedNone:'완료(초록) 표시된 세트가 없어요',
   trainTag:'훈련',prTag:'PR',
   prilTitle:'Prilepin 종목별 점검',
   prilNone:'오늘은 Prilepin 집계 대상 종목이 없어요 (풀·보조·회복일)',
-  prilFoot:'프릴레핀 총 반복수는 종목별 기준이라 경기 종목만 따로 셉니다. 풀·저크드라이브·랙저크·OHS·스쿼트와 고강도 싱글 보강은 제외.',
+  prilFoot:'경기 종목만 종목별로 셉니다(풀·저크드라이브·스쿼트·헤비 싱글 제외). 이 프로그램은 일부러 저볼륨이라 최소치 미달은 "계획된 감량"으로 표시하고, 과잉만 경고합니다.',
+  legacyDay:'이전 프로그램(4일·12주) 기간의 기록입니다 — 완료 {d}세트 · 실패 {f}세트. 운동 구성이 달라 세부 내역은 표시하지 않아요.',
+  legacyNone:'이전 프로그램 기간 — 기록 없음',
   stOk:'적정',stLow:'부족',stHigh:'과잉',stPlanned:'계획된 감량',
   exNames:{snatch:'스내치',cleanjerk:'클린&저크',squat:'백 스쿼트',frontsquat:'프론트 스쿼트',press:'푸시 프레스',ohs:'오버헤드 스쿼트',eccdl:'익센트릭 DL',powersn:'파워 스내치',powercj:'파워 클린(+저크)'},
   logOpts:[{v:'snatch',l:'스내치'},{v:'cleanjerk',l:'클린&저크'},{v:'squat',l:'백 스쿼트'},{v:'frontsquat',l:'프론트 스쿼트'},{v:'press',l:'푸시 프레스'}],
@@ -857,7 +864,7 @@ var LNG={
   newCycleDone:'New cycle started at Week 1 - check your PRs in Settings',
   postponeBlocked:'Already postponed this week. Available again in {n} day(s).',
   postponed:'Postponed by one week',advanced:'Week changed',
-  sDow:'Training days (max 4)',btnSaveDow:'Save days',
+  sDow:'Training days (3 · Mon/Wed/Fri suggested)',btnSaveDow:'Save days',
   dowNames:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
   sData:'Data',btnExp:'Export JSON',btnImp:'Import JSON',btnResetAll:'Reset all sets',
   lastExportL:'Last backup',neverExported:'never - weekly backups recommended',
@@ -874,13 +881,15 @@ var LNG={
   dotTip:'Tap dots to toggle set status',
   newPR:'New PR!',logAdded:'Record added',saved:'Saved!',
   dowSaved:'Days saved!',exported:'Exported',imported:'Imported!',importErr:'Invalid file',
-  maxDow:'Maximum 4 days allowed',minDow:'Select at least 1 day',
+  maxDow:'Pick exactly 3 days',minDow:'Select at least 1 day',
   drvTitle:'Derived weights (from current inputs)',
   btnSaveDay:'📈 Save session to graph',savedDay:'lifts saved',savedNone:'No sets marked done (green) yet',
   trainTag:'train',prTag:'PR',
   prilTitle:'Prilepin check, per exercise',
   prilNone:'No Prilepin-counted lifts today (pull / accessory / recovery day)',
-  prilFoot:'Prilepin totals are per exercise, so only competition lifts are counted. Pulls, jerk drives, rack jerks, OHS, squats and heavy-single primers are excluded.',
+  prilFoot:'Only competition lifts are counted, per exercise (pulls, jerk drives, squats and heavy singles excluded). This program is low-volume on purpose, so falling short shows as "planned"; only too many reps is a warning.',
+  legacyDay:'From the previous program (4-day, 12-week) - {d} sets done · {f} failed. Exercise detail is hidden because the layout differed.',
+  legacyNone:'Previous program period - no records',
   stOk:'OK',stLow:'Low',stHigh:'High',stPlanned:'planned',
   exNames:{snatch:'Snatch',cleanjerk:'Clean & Jerk',squat:'Back Squat',frontsquat:'Front Squat',press:'Push Press',ohs:'Overhead Squat',eccdl:'Eccentric DL',powersn:'Power Snatch',powercj:'Power Clean(+Jerk)'},
   logOpts:[{v:'snatch',l:'Snatch'},{v:'cleanjerk',l:'Clean & Jerk'},{v:'squat',l:'Back Squat'},{v:'frontsquat',l:'Front Squat'},{v:'press',l:'Push Press'}],
@@ -927,6 +936,9 @@ var prs=lget('prs',{}),setStates=lget('sets',{}),logs=lget('logs',[]);
 // dtier: { 'YYYY-MM-DD': volTier } - the volume tier in force that day, so changing tiers later
 // cannot rewrite how many sets a past session was supposed to have.
 var dweek=lget('dweek',{});
+// miss: { setKey: reasonKey } - where a failed set broke down (see MISS_REASONS)
+var missLog=lget('miss',{});
+if(!missLog||typeof missLog!=='object')missLog={};
 var dtier=lget('dtier',{});
 var curWeek=Math.min(lget('week',0),11);
 // Auto week advance: cycleStart is the date Week 1 began. The date-derived week is only ever a
@@ -938,8 +950,8 @@ var cycleStart=lget('cycleStart',null);
 var lastPostpone=lget('lastPostpone',null);
 var lastExport=lget('lastExport',null);
 
-var wDows=lget('dows',[1,2,4,5]);
-if(!Array.isArray(wDows)||!wDows.length)wDows=[1,2,4,5];
+var wDows=lget('dows',[1,3,5]);
+if(!Array.isArray(wDows)||wDows.length!==DAYS_N)wDows=[1,3,5];
 var lang=lget('lang','ko');
 var roundUnit=lget('roundUnit',2.5);
 // volume tier: scales SET COUNT only (intensity % and reps/set stay coach/Prilepin-matched)
@@ -950,7 +962,8 @@ var waveOn=lget('waveOn',true);
 // with zero 90%+ exposure. These add 2x1 @90% on specific days to keep neural familiarity with
 // heavy loads, without meaningfully adding volume. Opt-in; base program data is never mutated.
 var heavySingles=lget('heavySingles',false);
-var HEAVY_PLAN={2:{0:'snatch',1:'cleanjerk'},5:{0:'snatch',1:'cleanjerk'},7:{0:'snatch',1:'cleanjerk'}};
+// Retired in v3: every Mon/Wed session now opens with a heavy single, so no primers are added.
+var HEAVY_PLAN={};
 var HEAVY_PCT=0.90, HEAVY_SETS=2;
 var VOL_TIER_MULT={hobby:0.7,semipro:1.0,national:1.35};
 // body metrics for level analysis
@@ -1563,7 +1576,9 @@ function getPrilepinZone(p){for(var i=0;i<PRILEPIN.length;i++){if(p>=PRILEPIN[i]
 // Heavy-single primers are deliberate 2-rep neural doses, not a volume block, so they are exempt too.
 var CLASSIC_TIP={lift:1,power:1,'3pos':1};
 function isClassic(ex){return !ex.ladder&&!!ex.tip&&!!CLASSIC_TIP[ex.tip]&&(ex.base==='snatch'||ex.base==='cleanjerk');}
-function zoneStatus(reps,z){var st=reps<z[2]?'low':reps>z[4]?'high':'ok';return (st==='low'&&TAPER_WEEKS[curWeek])?'planned':st;}
+// v3 is deliberately low-volume / high-intensity, so falling short of Prilepin's minimum is the plan
+// on every week. Only 'high' (too many reps) remains a real warning.
+function zoneStatus(reps,z){var st=reps<z[2]?'low':reps>z[4]?'high':'ok';return st==='low'?'planned':st;}
 function calcDayVolume(){
   var ds=todayStr();
   var totalKg=0,mainKg=0,extraKg=0,snatchKg=0,cjKg=0;
@@ -1703,8 +1718,11 @@ function renderToday(){
     div.innerHTML='<div class="exn">'+exName(ex)+' '+tipHtml+'</div>'+noteHtml+
       '<div class="exm">'+chipRow+'</div>'+ctrlRow;
     div.appendChild(srow);
+    var mr=missRowHtml(ds,curDay,ei,ex,nSets);
+    if(mr){var mw=document.createElement('div');mw.innerHTML=mr;div.appendChild(mw);}
     list.appendChild(div);
   });
+  renderWarmGuide();
   renderVolumeBanner();
   renderExtras();
   renderAutoWeekBanner();
@@ -1716,11 +1734,107 @@ function tapSet(ds,di,ei,si,rest){
   var c=setStates[k]||'p';
   setStates[k]=c==='p'?'d':c==='d'?'f':'p';
   lset('sets',setStates);
+  if(setStates[k]!=='f'&&missLog[k]){delete missLog[k];lset('miss',missLog);}
   if(ds===todayStr())renderToday();
   if(document.getElementById('screen-cal').classList.contains('active'))renderCalDet(ds);
   if(setStates[k]==='d')openTimer(rest);
 }
-function changeDay(d){curDay=(curDay+d+4)%4;lset('day',curDay);renderToday();}
+function changeDay(d){curDay=(curDay+d+DAYS_N)%DAYS_N;lset('day',curDay);renderToday();}
+// ===== WARM-UP GUIDE =====
+// Order follows the warm-up evidence: raise muscle temperature -> slow, controlled dynamic mobility
+// (no static stretching before lifting) -> empty bar -> barbell ramp-up. Day 1 comes after the rest
+// days, so its temperature step and ramp-up run one step longer. Ramp percentages are suggestions.
+var RAMP_LONG=[.40,.50,.60,.70,.78,.84], RAMP_STD=[.50,.62,.72,.80,.85];
+function warmTarget(dd){
+  for(var i=0;i<dd.ex.length;i++){
+    var ex=dd.ex[i];
+    if(ex.base!=='snatch'&&ex.base!=='cleanjerk')continue;
+    if(ex.ladder)return{ex:ex,pct:0.90};
+    if(ex.tip==='heavy'||ex.tip==='lift'||ex.tip==='power')return{ex:ex,pct:ex.pct};
+  }
+  return null;
+}
+function renderWarmGuide(){
+  var el=document.getElementById('WARM_GUIDE');if(!el)return;
+  var ko=lang==='ko',dd=dayOf(curWeek,curDay),long=(curDay===0),t=warmTarget(dd);
+  var isSn=!t||t.ex.base==='snatch';
+  var steps=[
+    ko?['체온 올리기','로잉·자전거·줄넘기 등 가볍게 땀이 날 정도 '+(long?'8~10분':'5~8분')]
+      :['Raise temperature','Rower, bike or rope until lightly sweating, '+(long?'8-10 min':'5-8 min')],
+    ko?['동적 가동범위','천천히 조절, 반동·정적 스트레칭 X — 레그 스윙 앞뒤·옆 각 10 · 발목 무릎 넘기기 각 10 · 흉추 회전 각 8 · 봉 디스로케이트 10 · 맨몸 딥스쿼트 정지 10'+(long?' · <b>2바퀴</b>':'')]
+      :['Dynamic mobility','Slow and controlled, no bouncing or static holds - leg swings front/side 10 each · ankle knee-overs 10 each · T-spine rotations 8 each · stick dislocates 10 · bodyweight deep-squat holds 10'+(long?' · <b>2 rounds</b>':'')],
+    isSn?(ko?['빈 봉','스내치 콤플렉스 (풀+하이풀+머슬스내치+OHS) 2×5']:['Empty bar','Snatch complex (pull + high pull + muscle snatch + OHS) 2x5'])
+        :(ko?['빈 봉','클린 풀 + 프론트 스쿼트 + 저크 드라이브 2×5 (팔 통증 없는 범위)']:['Empty bar','Clean pull + front squat + jerk drive 2x5 (pain-free range only)'])
+  ];
+  if(t){
+    var pr=getPR(t.ex.base);
+    var list=(long?RAMP_LONG:RAMP_STD).filter(function(p){return p<=t.pct-0.03;});
+    var chips=list.map(function(p){var r=p<0.55?3:p<0.75?2:1;return '<span>'+roundW(pr*p)+'kg×'+r+'</span>';});
+    chips.push('<span style="background:var(--gl);color:var(--gd);font-weight:700;">'+roundW(pr*t.pct)+'kg</span>');
+    steps.push([ko?'램프업':'Ramp-up',(ko?exName(t.ex)+' 기준 · 단계 사이 1~2분':'For '+exName(t.ex)+' · 1-2 min between steps')+
+      '<div class="wg-ramp">'+chips.join('<i class="ti ti-arrow-right" style="font-size:11px;color:var(--tx3);"></i>')+'</div>']);
+  }
+  el.innerHTML='<div class="wg">'+
+    (long?'<div class="wg-long">'+(ko?'휴식 다음 날 — 체온·램프업 한 단계 더':'After rest days - one extra step for temperature and ramp-up')+'</div>':'')+
+    steps.map(function(st,i){return '<div class="wg-step"><span class="wg-n">'+(i+1)+'</span><div class="wg-t"><b>'+st[0]+'</b><div class="wg-sub">'+st[1]+'</div></div></div>';}).join('')+
+    '</div>';
+}
+
+// ===== MISS LOG =====
+// Where a failed set broke down. Stored per set key; only shown for sets marked failed (red).
+var MISS_REASONS=[
+ {k:'pull',ko:'첫 풀',en:'1st pull',j:0},
+ {k:'trans',ko:'전환·세컨풀',en:'Transition/2nd pull',j:0},
+ {k:'catch',ko:'캐치',en:'Catch',j:0},
+ {k:'stand',ko:'일어서기',en:'Stand-up',j:0},
+ {k:'drive',ko:'저크 드라이브',en:'Jerk drive',j:1},
+ {k:'jcatch',ko:'저크 캐치·고정',en:'Jerk catch/lockout',j:1}
+];
+function missLabel(k){for(var i=0;i<MISS_REASONS.length;i++){if(MISS_REASONS[i].k===k)return lang==='ko'?MISS_REASONS[i].ko:MISS_REASONS[i].en;}return k;}
+function missEligible(ex){return (ex.base==='snatch'||ex.base==='cleanjerk')&&(ex.ladder||ex.tip==='heavy'||ex.tip==='lift'||ex.tip==='segclean'||ex.tip==='power');}
+function missHasJerk(ex){return ex.base==='cleanjerk'&&(ex.ladder||ex.tip==='heavy'||String(ex.reps).indexOf('+')!==-1);}
+function missRowHtml(ds,di,ei,ex,nSets){
+  if(!missEligible(ex))return '';
+  var jerk=missHasJerk(ex),out='';
+  for(var s=0;s<nSets;s++){
+    var k=setKey(ds,di,ei,s);
+    if(setStates[k]!=='f')continue;
+    var cur=missLog[k]&&missLog[k].r;
+    out+='<div class="missrow"><span>'+(lang==='ko'?(s+1)+'세트 실패 지점':'Set '+(s+1)+' failed at')+'</span>'+
+      MISS_REASONS.filter(function(m){return jerk||!m.j;}).map(function(m){
+        return '<button class="mchip'+(cur===m.k?' on':'')+'" onclick="setMiss(\''+k+'\',\''+m.k+'\',\''+ex.base+'\')">'+(lang==='ko'?m.ko:m.en)+'</button>';
+      }).join('')+'</div>';
+  }
+  return out;
+}
+function setMiss(k,r,b){
+  if(missLog[k]&&missLog[k].r===r)delete missLog[k];
+  else missLog[k]={r:r,b:b};
+  lset('miss',missLog);
+  renderToday();
+}
+function missSummaryHtml(){
+  var ko=lang==='ko',cutoff=shiftDateStr(todayStr(),-27),cnt={snatch:{},cleanjerk:{}},unl=0;
+  Object.keys(missLog).forEach(function(k){
+    var m=missLog[k];if(!m||!cnt[m.b])return;
+    if(k.slice(0,10)<cutoff||setStates[k]!=='f')return;
+    cnt[m.b][m.r]=(cnt[m.b][m.r]||0)+1;
+  });
+  Object.keys(setStates).forEach(function(k){
+    if(setStates[k]!=='f'||k.indexOf('-X')!==-1||k.slice(0,10)<cutoff||missLog[k])return;
+    if(progV3Since&&k.slice(0,10)<progV3Since)return;
+    unl++;
+  });
+  var row=function(b){
+    var parts=MISS_REASONS.filter(function(m){return cnt[b][m.k];}).sort(function(x,y){return cnt[b][y.k]-cnt[b][x.k];})
+      .map(function(m){return (ko?m.ko:m.en)+' <b>'+cnt[b][m.k]+'</b>';});
+    return '<div class="pexr"><span class="pexn">'+L().exNames[b]+'</span><div class="pexrv" style="text-align:right;">'+(parts.length?parts.join(' · '):(ko?'기록 없음':'none'))+'</div></div>';
+  };
+  return '<div class="pdtitle"><i class="ti ti-alert-triangle" style="color:var(--r)"></i> '+(ko?'실패 지점 — 최근 4주':'Where lifts failed - last 4 weeks')+'</div>'+
+    row('snatch')+row('cleanjerk')+
+    (unl?'<div style="font-size:11px;color:var(--tx3);margin-top:6px;">'+(ko?'지점 미선택 실패 '+unl+'세트 — 오늘 탭의 빨간 세트 아래에서 고를 수 있어요':unl+' failed sets without a reason - pick one under the red set on the Today tab')+'</div>':'');
+}
+
 
 // ===== EXTRA EXERCISES (ad-hoc: warm-ups before main, accessories after) =====
 var pickerState={warm:false,acc:false};
@@ -2039,7 +2153,15 @@ function renderCalDet(ds,diOvr){
     var keys=Object.keys(setStates).filter(function(k){return k.indexOf(ds)===0;});
     if(keys.length>0)di=parseInt(keys[0].split('-')[3]);
   }
-  if(di===null||isNaN(di)||di<0||di>3){
+  if(progV3Since&&ds<progV3Since){
+    var lk=Object.keys(setStates).filter(function(k){return k.indexOf(ds+'-')===0;});
+    var ld=lk.filter(function(k){return setStates[k]==='d';}).length,lf=lk.filter(function(k){return setStates[k]==='f';}).length;
+    det.style.display='block';
+    det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div>'+
+      '<div style="font-size:13px;color:var(--tx2);line-height:1.6;">'+(lk.length?l.legacyDay.replace('{d}',ld).replace('{f}',lf):l.legacyNone)+'</div>';
+    return;
+  }
+  if(di===null||isNaN(di)||di<0||di>=DAYS_N){
     det.style.display='block';
     det.innerHTML='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px;">'+ds+'</div><div style="font-size:13px;color:var(--tx2);">'+l.restDay+'</div>';
     return;
@@ -2079,8 +2201,10 @@ function renderCalDet(ds,diOvr){
       dots.appendChild(dot);
     }
     var wdisp=ex.ladder?ladderStr(ex):effW(ex,adj)+'kg';
+    var mr=[];for(var s2=0;s2<nSets;s2++){var mk=setKey(ds,di,ei,s2);if(setStates[mk]==='f'&&missLog[mk])mr.push(missLabel(missLog[mk].r));}
     var row=document.createElement('div');row.className='cexr';
-    row.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+exName(ex)+'</div><div style="font-size:11px;color:var(--tx2);">'+wdisp+' · '+d2+'/'+nSets+'</div></div>';
+    row.innerHTML='<div><div style="font-size:13px;font-weight:600;color:var(--tx);">'+exName(ex)+'</div><div style="font-size:11px;color:var(--tx2);">'+wdisp+' · '+d2+'/'+nSets+'</div>'+
+      (mr.length?'<div style="font-size:11px;color:var(--r);">'+(lang==='ko'?'실패: ':'Failed: ')+mr.join(', ')+'</div>':'')+'</div>';
     row.appendChild(dots);
     det.appendChild(row);
   });
@@ -2091,7 +2215,7 @@ function renderDowGrid(){
   var l=L();
   document.getElementById('DOW_GRID').innerHTML=l.dowNames.map(function(n,i){
     var sel=tmpDows.indexOf(i)!==-1;
-    var dis=!sel&&tmpDows.length>=4;
+    var dis=!sel&&tmpDows.length>=DAYS_N;
     return '<button class="dbtn'+(sel?' sel':'')+(dis?' dis':'')+'" onclick="togDow('+i+')">'+n+'</button>';
   }).join('');
   var names=tmpDows.slice().sort(function(a,b){return a-b;}).map(function(d){return l.dowNames[d];}).join(', ');
@@ -2100,12 +2224,12 @@ function renderDowGrid(){
 function togDow(i){
   var idx=tmpDows.indexOf(i);
   if(idx!==-1)tmpDows.splice(idx,1);
-  else if(tmpDows.length<4)tmpDows.push(i);
+  else if(tmpDows.length<DAYS_N)tmpDows.push(i);
   else{toast(L().maxDow);return;}
   renderDowGrid();
 }
 function saveDow(){
-  if(tmpDows.length===0){toast(L().minDow);return;}
+  if(tmpDows.length!==DAYS_N){toast(L().maxDow);return;}
   wDows=tmpDows.slice().sort(function(a,b){return a-b;});
   lset('dows',wDows);toast(L().dowSaved);
   renderToday();renderCal();
@@ -2149,11 +2273,12 @@ function updDrv(){
   var sn=inpVal('snatch'),cj=inpVal('cleanjerk');
   document.getElementById('DRV_TITLE').textContent=l.drvTitle;
   var rows=[
-    ['세그먼트/스내치 풀 90%','Segment/Snatch Pull 90%',roundW(sn*0.90)],
+    ['스내치 헤비 싱글 88/91/94%','Snatch heavy single 88/91/94%',roundW(sn*0.88)+' / '+roundW(sn*0.91)+' / '+roundW(sn*0.94)],
+    ['C&J 헤비 싱글 88/91/94%','C&J heavy single 88/91/94%',roundW(cj*0.88)+' / '+roundW(cj*0.91)+' / '+roundW(cj*0.94)],
     ['클린 풀 100%','Clean Pull 100%',roundW(cj*1.00)],
-    ['랙 저크 85%','Rack Jerk 85%',roundW(cj*0.85)],
-    ['저크 드라이브 95%','Jerk Drive 95%',roundW(cj*0.95)],
-    ['익센트릭 데드리프트 90%','Eccentric DL 90%',roundW(cj*0.90)]
+    ['세그먼트 클린 85%','Segment Clean 85%',roundW(cj*0.85)],
+    ['저크 드라이브 90%','Jerk Drive 90%',roundW(cj*0.90)],
+    ['행 하이 풀 · 점프 슈러그 45%','Hang High Pull · Jump Shrug 45%',roundW(cj*0.45)]
   ];
   document.getElementById('DRV_ROWS').innerHTML=rows.map(function(r){
     return '<div class="drow"><span>'+(lang==='ko'?r[0]:r[1])+'</span><span><b style="color:var(--b)">'+r[2]+'kg</b></span></div>';
@@ -2177,6 +2302,7 @@ function renderProgram(){
   var waveStr=(waveOn&&WAVE[curWeek])?(' · '+l.waveCurL+' '+waveLabel(curWeek)):'';
   document.getElementById('PROG_NOTE').innerHTML=(lang==='ko'?w.nk:w.ne)+'<br><span style="opacity:.7">'+dowStr+' · '+l.volTierNames[volTier]+waveStr+'</span>';
   var list=document.getElementById('PROG_LIST');list.innerHTML='';
+  var msum=document.createElement('div');msum.className='pdcard';msum.innerHTML=missSummaryHtml();list.appendChild(msum);
   w.days.forEach(function(_dd,di){
     var dd=dayOf(curWeek,di);
     var d=document.createElement('div');d.className='pdcard';
@@ -2316,7 +2442,7 @@ function collectPrefixedForExport(prefix){
   return out;
 }
 function exportData(){
-  var data={prs:prs,logs:logs,curWeek:curWeek,curDay:curDay,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,waveOn:waveOn,heavySingles:heavySingles,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,lastPostpone:lastPostpone,dweek:dweek,dtier:dtier,extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
+  var data={prs:prs,logs:logs,curWeek:curWeek,curDay:curDay,setStates:setStates,wDows:wDows,lang:lang,roundUnit:roundUnit,volTier:volTier,waveOn:waveOn,heavySingles:heavySingles,body:bodyMetrics,autoWeek:autoWeek,cycleStart:cycleStart,lastPostpone:lastPostpone,dweek:dweek,dtier:dtier,miss:missLog,progV3Since:lget('progV3Since',null),extras:collectPrefixedForExport('extra_'),madj:collectPrefixedForExport('madj_'),date:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='weightlifting_'+new Date().toISOString().slice(0,10)+'.json';a.click();
@@ -2331,17 +2457,22 @@ function importData(e){
     try{
       var d=JSON.parse(ev.target.result);
       if(d.prs)prs=d.prs;if(d.logs)logs=d.logs;
-      if(d.curWeek!=null)curWeek=Math.min(d.curWeek,11);
-      if(d.curDay!=null)curDay=Math.max(0,Math.min(3,d.curDay));
-      if(d.setStates)setStates=d.setStates;if(d.wDows)wDows=d.wDows;
+      // A backup from before the 3-day switch has no progV3Since: its week / cycle position belongs to
+      // the old program, so only history comes across and the current cycle position is kept.
+      var v3=isValidDateStr(d.progV3Since);
+      if(v3){progV3Since=d.progV3Since;lset('progV3Since',progV3Since);}
+      if(v3&&d.curWeek!=null)curWeek=Math.max(0,Math.min(d.curWeek,11));
+      if(v3&&d.curDay!=null)curDay=Math.max(0,Math.min(DAYS_N-1,d.curDay));
+      if(d.setStates)setStates=d.setStates;
+      if(Array.isArray(d.wDows)&&d.wDows.length===DAYS_N)wDows=d.wDows;
+      if(d.miss&&typeof d.miss==='object'){missLog=d.miss;lset('miss',missLog);}
       if(d.lang)lang=d.lang;if(d.roundUnit)roundUnit=d.roundUnit;
       if(d.volTier&&VOL_TIER_MULT[d.volTier])volTier=d.volTier;
-      if(d.waveOn!=null)waveOn=!!d.waveOn;
-      if(d.heavySingles!=null)heavySingles=!!d.heavySingles;
+
       if(d.body)bodyMetrics={bw:d.body.bw!=null?d.body.bw:null,ht:d.body.ht!=null?d.body.ht:null,sex:d.body.sex==='f'?'f':'m'};
       if(d.autoWeek!=null)autoWeek=!!d.autoWeek;
-      if(isValidDateStr(d.cycleStart))cycleStart=d.cycleStart;
-      if(isValidDateStr(d.lastPostpone))lastPostpone=d.lastPostpone;
+      if(v3&&isValidDateStr(d.cycleStart))cycleStart=d.cycleStart;
+      if(v3&&isValidDateStr(d.lastPostpone))lastPostpone=d.lastPostpone;
       if(d.dweek)dweek=d.dweek;
       if(d.dtier)dtier=d.dtier;
       lset('prs',prs);lset('logs',logs);lset('week',curWeek);lset('day',curDay);lset('sets',setStates);lset('dows',wDows);lset('lang',lang);lset('roundUnit',roundUnit);lset('volTier',volTier);lset('waveOn',waveOn);lset('heavySingles',heavySingles);lset('body',bodyMetrics);lset('autoWeek',autoWeek);lset('cycleStart',cycleStart);lset('lastPostpone',lastPostpone);lset('dweek',dweek);lset('dtier',dtier);
@@ -2414,12 +2545,32 @@ function sw(name){
   curWeek=6;lset('week',curWeek);
   lset('seedV2',true);
 })();
+// One-time switch to the 3-day program (v3, 2026-10-16). Old sessions stay in storage untouched,
+// but they were recorded against the old 4-day layout, so dates before the switch are shown as
+// legacy history instead of being re-rendered with the new exercise list.
+// Week 1 starts on the first Monday on/after the day the new version is first opened.
+(function migrateV3(){
+  if(lget('progV3',false))return;
+  var t=todayStr();
+  lset('progV3Since',t);
+  wDows=[1,3,5];lset('dows',wDows);
+  waveOn=false;lset('waveOn',false);
+  heavySingles=false;lset('heavySingles',false);
+  var d=parseDate(t);d.setDate(d.getDate()+((1-d.getDay()+7)%7));
+  cycleStart=dStr(d.getFullYear(),d.getMonth(),d.getDate());lset('cycleStart',cycleStart);
+  autoWeek=true;lset('autoWeek',true);
+  lastPostpone=null;lset('lastPostpone',null);
+  curWeek=0;lset('week',0);
+  var di=detectTodayDayIdx();curDay=di!==null?di:0;lset('day',curDay);
+  lset('progV3',true);
+})();
+var progV3Since=lget('progV3Since',null);
 // Runs at boot, after every state var is initialized: a corrupt stored value used to throw
 // during the first render and leave a permanently blank screen.
 function sanitizeState(){
   if(!LNG[lang]){lang='ko';lset('lang','ko');}
   if(!VOL_TIER_MULT[volTier]){volTier='semipro';lset('volTier','semipro');}
-  if(!Array.isArray(wDows)||!wDows.length){wDows=[1,2,4,5];lset('dows',wDows);}
+  if(!Array.isArray(wDows)||wDows.length!==DAYS_N){wDows=[1,3,5];lset('dows',wDows);}
   if(typeof roundUnit!=='number'||!isFinite(roundUnit)||roundUnit<=0){roundUnit=2.5;lset('roundUnit',2.5);}
   if(!prs||typeof prs!=='object'){prs={};}
   if(!setStates||typeof setStates!=='object'){setStates={};}
@@ -2435,7 +2586,7 @@ function sanitizeState(){
   if(typeof curWeek!=='number'||!isFinite(curWeek)){curWeek=0;lset('week',0);}
   curWeek=Math.max(0,Math.min(11,Math.floor(curWeek)));
   if(typeof curDay!=='number'||!isFinite(curDay))curDay=0;
-  curDay=Math.max(0,Math.min(3,Math.floor(curDay)));
+  curDay=Math.max(0,Math.min(DAYS_N-1,Math.floor(curDay)));
 }
 function bootApp(){
   checkStorage();
@@ -2450,7 +2601,7 @@ try{
   try{
     lang=LNG[lang]?lang:'ko';
     volTier=VOL_TIER_MULT[volTier]?volTier:'semipro';
-    if(!Array.isArray(wDows)||!wDows.length)wDows=[1,2,4,5];
+    if(!Array.isArray(wDows)||wDows.length!==DAYS_N)wDows=[1,3,5];
     if(typeof roundUnit!=='number'||!isFinite(roundUnit)||roundUnit<=0)roundUnit=2.5;
     if(!isValidDateStr(cycleStart))cycleStart=null;
     if(!isValidDateStr(lastPostpone))lastPostpone=null;
